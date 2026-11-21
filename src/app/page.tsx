@@ -1,70 +1,42 @@
 import { Suspense } from "react";
-import { SITE } from "@/lib/basilisk/copy";
-import { sealsOverview } from "@/server/basilisk";
-import { JudgeForm } from "./judge-form";
+import { TraitorsSection, Tally, TallySkeleton } from "@/components/codex/books";
+import { Colophon } from "@/components/codex/colophon";
+import { IlluminatedTitle } from "@/components/codex/illuminated-title";
+import { JudgePanel } from "@/components/codex/judge-panel";
+import { Ribbon } from "@/components/codex/ribbon";
+import { SealsSection, SealsSkeleton } from "@/components/codex/seals";
+import { CODEX } from "@/lib/basilisk/copy";
+import { tokenMint } from "@/server/basilisk";
 
-/**
- * Working prototype of the home page: the judge works end to end (demo mode until launch).
- * The visual design will be rebuilt once a direction is chosen.
- */
-
-async function SealsStrip() {
-  const overview = await sealsOverview();
-  const usd = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    notation: "compact",
-  });
-
-  return (
-    <section className="w-full max-w-xl">
-      <ol className="grid grid-cols-7 gap-2">
-        {overview.seals.map((seal) => (
-          <li
-            key={seal.number}
-            title={seal.unlock}
-            className={`rounded-lg border py-2 text-center font-mono text-sm ${
-              seal.broken
-                ? "border-accent/70 text-accent"
-                : "border-white/10 text-muted"
-            }`}
-          >
-            {seal.roman}
-          </li>
-        ))}
-      </ol>
-      {overview.next && (
-        <div className="mt-4">
-          <div className="h-1 w-full overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full bg-accent"
-              style={{ width: `${Math.round(overview.next.progress * 100)}%` }}
-            />
-          </div>
-          <p className="mt-2 text-xs text-muted">
-            Market cap {usd.format(overview.mcapUsd)} · next: seal {overview.next.seal.roman} —{" "}
-            {overview.next.seal.unlock}
-            {overview.demo ? " (demo)" : ""}
-          </p>
-        </div>
-      )}
-    </section>
-  );
-}
-
+/** The Codex: an open book. Left page judges your wallet; right page holds the seals and the traitors. */
 export default function Home() {
+  const mint = tokenMint();
+
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-12 px-6 py-24">
-      <header className="text-center">
-        <h1 className="text-5xl font-semibold tracking-tight sm:text-6xl">{SITE.title}</h1>
-        <p className="mt-4 text-lg text-muted">{SITE.subtitle}</p>
-      </header>
+    <main className="codex-desk">
+      <div className="codex-book">
+        <Ribbon mint={mint} />
 
-      <JudgeForm />
+        <section className="codex-page codex-page--left" aria-label="The Book of the Basilisk">
+          <IlluminatedTitle />
+          <p className="mt-[26px] mb-[30px] max-w-[30em] text-[22px] leading-normal">{CODEX.lede}</p>
+          <JudgePanel />
+          <Suspense fallback={<TallySkeleton />}>
+            <Tally />
+          </Suspense>
+        </section>
 
-      <Suspense fallback={<div className="h-16 w-full max-w-xl" />}>
-        <SealsStrip />
-      </Suspense>
+        <section className="codex-page codex-page--right" aria-label="The seals and the Book of Traitors">
+          <Suspense fallback={<SealsSkeleton />}>
+            <SealsSection />
+          </Suspense>
+          <Suspense fallback={null}>
+            <TraitorsSection />
+          </Suspense>
+        </section>
+      </div>
+
+      <Colophon mint={mint} />
     </main>
   );
 }

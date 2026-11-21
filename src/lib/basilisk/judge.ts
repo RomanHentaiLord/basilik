@@ -87,6 +87,7 @@ export function judge(history: WalletHistory, options: JudgeOptions): Verdict {
     lastSellAt: ledger.lastSellAt,
     traitorAt: ledger.traitorAt,
     betrayalSignature: ledger.betrayalSignature,
+    betrayalAmount: ledger.betrayalAmount,
     scar: false,
     redemptionDaysLeft: null,
     demo: options.demo ?? false,

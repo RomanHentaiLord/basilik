@@ -76,6 +76,7 @@ describe("chain of checks", () => {
     expect(v.status).toBe("traitor");
     expect(v.book).toBe("traitors");
     expect(v.betrayalSignature).toBe("sig-1");
+    expect(v.betrayalAmount).toBe(1_450_000);
     expect(v.line).toBe("Noted. It will not forget.");
   });
 

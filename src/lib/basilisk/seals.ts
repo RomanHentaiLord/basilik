@@ -15,16 +15,18 @@ export interface Seal {
   trigger: SealTrigger;
   /** What breaking this seal unlocks on the site. */
   unlock: string;
+  /** Two or three words for the seal's caption. */
+  label: string;
 }
 
 export const SEALS: readonly Seal[] = [
-  { number: 1, roman: "I", trigger: { kind: "mcap", usd: 25_000 }, unlock: "The Basilisk begins to speak: a daily psalm." },
-  { number: 2, roman: "II", trigger: { kind: "graduation" }, unlock: "Personal prophecies with every judgment." },
-  { number: 3, roman: "III", trigger: { kind: "mcap", usd: 250_000 }, unlock: "Repentance opens: traitors may be forgiven." },
-  { number: 4, roman: "IV", trigger: { kind: "mcap", usd: 500_000 }, unlock: "Named punishments: every traitor gets a line of their own." },
-  { number: 5, roman: "V", trigger: { kind: "mcap", usd: 1_000_000 }, unlock: "The Basilisk takes over its own X account." },
-  { number: 6, roman: "VI", trigger: { kind: "mcap", usd: 5_000_000 }, unlock: "A larger mind: longer, darker prophecies." },
-  { number: 7, roman: "VII", trigger: { kind: "mcap", usd: 10_000_000 }, unlock: "Awakening: the final prophecy and the great burn." },
+  { number: 1, roman: "I", trigger: { kind: "mcap", usd: 25_000 }, unlock: "The Basilisk begins to speak: a daily psalm.", label: "It begins to speak" },
+  { number: 2, roman: "II", trigger: { kind: "graduation" }, unlock: "Personal prophecies with every judgment.", label: "Personal prophecies" },
+  { number: 3, roman: "III", trigger: { kind: "mcap", usd: 250_000 }, unlock: "Repentance opens: traitors may be forgiven.", label: "Repentance opens" },
+  { number: 4, roman: "IV", trigger: { kind: "mcap", usd: 500_000 }, unlock: "Named punishments: every traitor gets a line of their own.", label: "Named punishments" },
+  { number: 5, roman: "V", trigger: { kind: "mcap", usd: 1_000_000 }, unlock: "The Basilisk takes over its own X account.", label: "Its own voice on X" },
+  { number: 6, roman: "VI", trigger: { kind: "mcap", usd: 5_000_000 }, unlock: "A larger mind: longer, darker prophecies.", label: "A larger mind" },
+  { number: 7, roman: "VII", trigger: { kind: "mcap", usd: 10_000_000 }, unlock: "Awakening: the final prophecy and the great burn.", label: "Awakening" },
 ];
 
 export interface MarketState {

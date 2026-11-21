@@ -59,6 +59,8 @@ export interface Verdict {
   traitorAt: number | null;
   /** Signature of the sale that made this wallet a traitor (shown as proof). */
   betrayalSignature: string | null;
+  /** Tokens sold in the betraying sale. */
+  betrayalAmount: number | null;
   /** Forgiven traitors keep a scar forever. */
   scar: boolean;
   /** Days left until forgiveness, when a traitor is repenting. */

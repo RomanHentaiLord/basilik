@@ -21,6 +21,7 @@ export interface Ledger {
   /** Time of the most recent betrayal; null if the wallet never betrayed. */
   traitorAt: number | null;
   betrayalSignature: string | null;
+  betrayalAmount: number | null;
   /** When the traitor had bought back the threshold and held it; null while not repenting. */
   redemptionStart: number | null;
 }
@@ -52,6 +53,7 @@ export function replay(events: readonly WalletEvent[]): Ledger {
     lastSellAt: null,
     traitorAt: null,
     betrayalSignature: null,
+    betrayalAmount: null,
     redemptionStart: null,
   };
 
@@ -98,6 +100,7 @@ export function replay(events: readonly WalletEvent[]): Ledger {
         // Fresh betrayal (by a faithful or a forgiven wallet).
         ledger.traitorAt = event.at;
         ledger.betrayalSignature = event.signature;
+        ledger.betrayalAmount = event.amount;
         ledger.redemptionStart = null;
         ledger.peak = balance;
         soldSincePeak = 0;
