@@ -1,10 +1,11 @@
 import "server-only";
-import { cacheLife, revalidateTag } from "next/cache";
+import { cacheLife, cacheTag, revalidateTag } from "next/cache";
 import {
   entryOf,
   MARKET_ATH_KEY,
   mergeMarketMemory,
   readState,
+  savedReading,
   saveEventRows,
   saveVerdicts,
   type MarketMemory,
@@ -25,25 +26,60 @@ export { tokenMint };
 /** How many imaginary wallets have entered the Book in demo mode, for entry numbers. */
 const DEMO_ENTERED = 1200;
 
+/** While the indexer's last reading is this fresh, a page uses it and asks nobody. */
+const SAVED_FRESH_MS = 5 * 60_000;
+/** When every source fails, the indexer's last reading is still shown if it is this fresh. */
+const SAVED_FALLBACK_MS = 30 * 60_000;
+
 export async function marketState(): Promise<MarketState & { demo: boolean; source: MarketSource }> {
   const mint = tokenMint();
   if (!mint) return { ...DEMO_MARKET, demo: true, source: "demo" };
-  const market = await getMarketState(mint);
-  if (!db) return { ...market, athMcapUsd: market.mcapUsd, demo: false };
+
+  const unconfirmed = async () => {
+    // Without the saved memory nothing can be confirmed: the reading stands on its own.
+    const live = await getMarketState(mint);
+    return { ...live, athMcapUsd: live.mcapUsd, demo: false };
+  };
+  if (!db) return unconfirmed();
+
+  let memory: MarketMemory | null;
   try {
-    // The indexer saves each reading; a high breaks seals once two readings in a row reach it.
-    const merged = mergeMarketMemory(await readState<MarketMemory>(db, MARKET_ATH_KEY), market);
-    return { ...market, graduated: merged.graduated, athMcapUsd: merged.usd, demo: false };
+    memory = await readState<MarketMemory>(db, MARKET_ATH_KEY);
   } catch (error) {
     console.error("[market] could not read the market memory", error);
-    return { ...market, athMcapUsd: market.mcapUsd, demo: false };
+    return unconfirmed();
   }
+
+  // The indexer read the market a moment ago: no rate limits, no slow price sites for a page.
+  const now = Date.now();
+  const fresh = savedReading(memory, now, SAVED_FRESH_MS);
+  if (fresh) {
+    return {
+      mcapUsd: fresh.mcapUsd,
+      graduated: Boolean(memory?.graduated),
+      athMcapUsd: memory?.usd ?? 0,
+      source: fresh.source as MarketSource,
+      demo: false,
+    };
+  }
+
+  const live = await getMarketState(mint);
+  const merged = mergeMarketMemory(memory, live, now);
+  const fallback = live.source === "none" ? savedReading(memory, now, SAVED_FALLBACK_MS) : null;
+  return {
+    mcapUsd: fallback?.mcapUsd ?? live.mcapUsd,
+    graduated: merged.graduated,
+    athMcapUsd: merged.usd,
+    source: (fallback?.source as MarketSource | undefined) ?? live.source,
+    demo: false,
+  };
 }
 
 /** Seals, market cap and progress. Cached for a minute: the page stays static between refreshes. */
 export async function sealsOverview() {
   "use cache";
   cacheLife("minutes");
+  cacheTag("market");
 
   const market = await marketState();
   const broken = countBrokenSeals(market);

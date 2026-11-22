@@ -9,7 +9,8 @@ const ASSOCIATED_TOKEN_PROGRAM = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25
 
 /** Hard cap so one hyperactive wallet cannot burn the RPC budget. */
 const MAX_SIGNATURES = 1000;
-const TX_BATCH = 20;
+/** Transactions per RPC request; each one counts against the RPC's requests per second. */
+const TX_BATCH = 10;
 
 interface SignatureInfo {
   signature: string;
@@ -87,7 +88,7 @@ export async function getWalletHistory(
   const signatureLists = await Promise.all(tokenAccounts.map(signaturesFor));
   const signatures = [...new Set(signatureLists.flat())].slice(0, MAX_SIGNATURES);
 
-  const transactions = (await getTransactions<ParsedTransaction>(signatures, TX_BATCH)).filter(
+  const transactions = (await getTransactions<ParsedTransaction>(signatures, { size: TX_BATCH })).filter(
     (tx): tx is ParsedTransaction => tx !== null,
   );
 

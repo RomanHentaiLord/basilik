@@ -16,34 +16,57 @@ export type AnyDb = PgDatabase<PgQueryResultHKT, typeof schema>;
 /** indexer_state key holding what the market has reached so far (seals never close). */
 export const MARKET_ATH_KEY = "market-ath";
 
-/** Highest confirmed market cap, whether the coin has left the bonding curve, and the last reading. */
+/** What the market has reached so far (seals never close), and the last good reading. */
 export interface MarketMemory {
+  /** Highest confirmed market cap. */
   usd: number;
   graduated?: boolean;
-  /** The previous reading. A new high only counts once the next reading reaches it too. */
+  /** The last reading that had a price. A new high only counts once the next one reaches it too. */
   lastUsd?: number;
+  /** Where that reading came from (chain, dexscreener…) and when (ms). */
+  lastSource?: string;
+  lastAt?: number;
 }
 
 /**
- * The stored memory plus a new reading. A high counts once two readings in a row reach it,
- * so one bad answer from a price source can never break a seal (seals never close again).
- * Graduation comes from the bonding curve itself and counts at once.
+ * The stored memory plus a new reading. A high counts once two good readings in a row reach
+ * it, so one bad answer from a price source can never break a seal. A reading without a price
+ * changes nothing but graduation, which comes from the bonding curve and counts at once.
  * `changed` says whether the memory needs saving.
  */
 export function mergeMarketMemory(
   memory: MarketMemory | null,
-  reading: { mcapUsd: number; graduated: boolean },
+  reading: { mcapUsd: number; graduated: boolean; source?: string },
+  now = Date.now(),
 ): Required<MarketMemory> & { changed: boolean } {
   // Memory saved before readings were confirmed has no lastUsd and may hold one bad reading
   // (the first DexScreener code read junk pairs): start over from the current reading.
   const known = memory?.lastUsd === undefined ? null : memory;
-  const confirmed = Math.min(known?.lastUsd ?? 0, reading.mcapUsd);
+  const priced = reading.mcapUsd > 0 && reading.source !== "none";
+  const confirmed = priced ? Math.min(known?.lastUsd ?? 0, reading.mcapUsd) : 0;
   const usd = Math.max(known?.usd ?? 0, confirmed);
   const graduated = Boolean(known?.graduated) || reading.graduated;
-  const lastUsd = reading.mcapUsd;
+  const lastUsd = priced ? reading.mcapUsd : (known?.lastUsd ?? 0);
+  const lastSource = priced ? (reading.source ?? "unknown") : (known?.lastSource ?? "none");
+  const lastAt = priced ? now : (known?.lastAt ?? 0);
   const changed =
-    !known || usd !== known.usd || graduated !== Boolean(known.graduated) || lastUsd !== known.lastUsd;
-  return { usd, graduated, lastUsd, changed };
+    !known ||
+    usd !== known.usd ||
+    graduated !== Boolean(known.graduated) ||
+    lastUsd !== known.lastUsd ||
+    lastAt !== (known.lastAt ?? 0);
+  return { usd, graduated, lastUsd, lastSource, lastAt, changed };
+}
+
+/** The last good reading, if it is at most `maxAgeMs` old. */
+export function savedReading(
+  memory: MarketMemory | null,
+  now: number,
+  maxAgeMs: number,
+): { mcapUsd: number; source: string; at: number } | null {
+  if (!memory?.lastUsd || !memory.lastAt || !memory.lastSource || memory.lastSource === "none") return null;
+  if (now - memory.lastAt > maxAgeMs) return null;
+  return { mcapUsd: memory.lastUsd, source: memory.lastSource, at: memory.lastAt };
 }
 
 export interface TraitorRow {

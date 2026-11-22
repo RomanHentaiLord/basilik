@@ -4,7 +4,7 @@ import { MARKET_ATH_KEY, mergeMarketMemory, readState, tryLock, unlock, writeSta
 import { db } from "@/db";
 import { countBrokenSeals } from "@/lib/basilisk/seals";
 import type { ParsedTransaction } from "@/lib/solana/parse";
-import { getMarketState } from "@/lib/solana/market";
+import { getMarketState, PROVIDERS } from "@/lib/solana/market";
 import { getTransactions, rpc } from "@/lib/solana/rpc";
 import { tokenMint } from "./env";
 import { runIndexer, type ChainSource, type IndexerResult, type SignatureInfo } from "./indexer-core";
@@ -13,16 +13,20 @@ import { runIndexer, type ChainSource, type IndexerResult, type SignatureInfo } 
 const MIN_INTERVAL_MS = 60_000;
 /** A run that crashed frees the lock after this long. */
 const LOCK_TTL_MS = 120_000;
-/** Transactions read per run: about 4 batched RPC calls, well inside a serverless time limit. */
+/** Transactions read per run: about 10 batched RPC calls, well inside a serverless time limit. */
 const BUDGET = 80;
-const TX_BATCH = 20;
+/** 8 transactions a second at most, so visitors' requests still fit in a 10-per-second RPC plan. */
+const TX_BATCH = 8;
+const TX_GAP_MS = 1_000;
+/** Nobody waits for the indexer: price sites get longer to answer than on a page. */
+const MARKET_TIMEOUT_MS = 8_000;
 
 /** The mint's transactions, through any Solana RPC. */
 function rpcSource(mint: string): ChainSource {
   return {
     signatures: ({ before, until, limit }) =>
       rpc<SignatureInfo[]>("getSignaturesForAddress", [mint, { limit, before, until, commitment: "confirmed" }]),
-    transactions: (signatures) => getTransactions<ParsedTransaction>(signatures, TX_BATCH),
+    transactions: (signatures) => getTransactions<ParsedTransaction>(signatures, { size: TX_BATCH, gapMs: TX_GAP_MS }),
   };
 }
 
@@ -57,10 +61,17 @@ export async function runIndexerOnce({ force = false }: { force?: boolean } = {}
 
   try {
     // Seals never close: keep the highest confirmed market cap, and graduation once it happened.
-    const market = await getMarketState(mint);
-    const memory = mergeMarketMemory(await readState<MarketMemory>(db, MARKET_ATH_KEY), market);
+    const market = await getMarketState(mint, PROVIDERS, MARKET_TIMEOUT_MS);
+    const memory = mergeMarketMemory(await readState<MarketMemory>(db, MARKET_ATH_KEY), market, now);
     if (memory.changed) {
-      await writeState(db, MARKET_ATH_KEY, { usd: memory.usd, graduated: memory.graduated, lastUsd: memory.lastUsd });
+      const saved: MarketMemory = {
+        usd: memory.usd,
+        graduated: memory.graduated,
+        lastUsd: memory.lastUsd,
+        lastSource: memory.lastSource,
+        lastAt: memory.lastAt,
+      };
+      await writeState(db, MARKET_ATH_KEY, saved);
     }
     const sealsBroken = countBrokenSeals({ mcapUsd: market.mcapUsd, graduated: memory.graduated, athMcapUsd: memory.usd });
 
@@ -70,6 +81,7 @@ export async function runIndexerOnce({ force = false }: { force?: boolean } = {}
 
     try {
       revalidateTag("books", "max");
+      revalidateTag("market", "max");
     } catch {
       // Outside a request scope: the Books refresh on their own within a minute.
     }
