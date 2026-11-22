@@ -34,12 +34,15 @@ export function mergeMarketMemory(
   memory: MarketMemory | null,
   reading: { mcapUsd: number; graduated: boolean },
 ): Required<MarketMemory> & { changed: boolean } {
-  const confirmed = Math.min(memory?.lastUsd ?? 0, reading.mcapUsd);
-  const usd = Math.max(memory?.usd ?? 0, confirmed);
-  const graduated = Boolean(memory?.graduated) || reading.graduated;
+  // Memory saved before readings were confirmed has no lastUsd and may hold one bad reading
+  // (the first DexScreener code read junk pairs): start over from the current reading.
+  const known = memory?.lastUsd === undefined ? null : memory;
+  const confirmed = Math.min(known?.lastUsd ?? 0, reading.mcapUsd);
+  const usd = Math.max(known?.usd ?? 0, confirmed);
+  const graduated = Boolean(known?.graduated) || reading.graduated;
   const lastUsd = reading.mcapUsd;
   const changed =
-    usd !== (memory?.usd ?? 0) || graduated !== Boolean(memory?.graduated) || lastUsd !== memory?.lastUsd;
+    !known || usd !== known.usd || graduated !== Boolean(known.graduated) || lastUsd !== known.lastUsd;
   return { usd, graduated, lastUsd, changed };
 }
 

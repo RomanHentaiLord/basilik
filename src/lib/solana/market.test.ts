@@ -197,6 +197,12 @@ describe("market memory", () => {
     expect(memory.usd).toBe(1_500_000);
   });
 
+  it("starts over from memory saved before readings were confirmed", () => {
+    // What the first live run stored on a test coin: a junk $14B high, never confirmed.
+    const memory = mergeMarketMemory({ usd: 14_008_714_280, graduated: true }, { mcapUsd: 1_495_998, graduated: true });
+    expect(memory).toEqual({ usd: 0, graduated: true, lastUsd: 1_495_998, changed: true });
+  });
+
   it("remembers graduation and the high when sources go quiet", () => {
     const memory = mergeMarketMemory({ usd: 90_000, graduated: true, lastUsd: 95_000 }, { mcapUsd: 0, graduated: false });
     expect(memory).toEqual({ usd: 90_000, graduated: true, lastUsd: 0, changed: true });
