@@ -4,8 +4,8 @@ import { CODEX } from "@/lib/basilisk/copy";
 export function IlluminatedTitle() {
   return (
     <header>
-      <p className="mb-7 text-[19px] italic text-rubric">{CODEX.incipit}</p>
-      <div className="flex items-start gap-[18px]">
+      <p className="page-kicker">{CODEX.incipit}</p>
+      <div className="initial-row">
         <div className="codex-initial" aria-hidden="true">
           <svg viewBox="0 0 128 128" fill="none">
             <path

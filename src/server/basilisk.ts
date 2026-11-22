@@ -1,4 +1,5 @@
 import "server-only";
+import { cacheLife } from "next/cache";
 import { demoHistory } from "@/lib/basilisk/demo";
 import { judge } from "@/lib/basilisk/judge";
 import { countBrokenSeals, nextSeal, SEALS, type MarketState } from "@/lib/basilisk/seals";
@@ -36,7 +37,11 @@ export async function judgeWallet(address: string): Promise<Verdict> {
   return judge(history, { now, sealsBroken: countBrokenSeals(market) });
 }
 
+/** Seals, market cap and progress. Cached for a minute: the page stays static between refreshes. */
 export async function sealsOverview() {
+  "use cache";
+  cacheLife("minutes");
+
   const market = await marketState();
   const broken = countBrokenSeals(market);
   return {

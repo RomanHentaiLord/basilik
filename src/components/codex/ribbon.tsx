@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { CODEX } from "@/lib/basilisk/copy";
+import { CODEX, JUDGMENT } from "@/lib/basilisk/copy";
+import { shortAddress } from "@/lib/solana/address";
 
-/** A red ribbon bookmark hanging over the book. It copies the contract address. */
+/** A red ribbon bookmark hanging from the top right corner. It holds and copies the contract address. */
 export function Ribbon({ mint }: { mint: string | null }) {
   const [copied, setCopied] = useState(false);
 
@@ -19,9 +20,23 @@ export function Ribbon({ mint }: { mint: string | null }) {
   }
 
   return (
-    <div className="codex-ribbon">
-      <button type="button" onClick={copy} disabled={!mint} aria-live="polite">
-        {!mint ? CODEX.notMinted : copied ? CODEX.copied : CODEX.copyCa}
+    <div className="ca-ribbon">
+      <button
+        type="button"
+        onClick={copy}
+        disabled={!mint}
+        title={mint ?? undefined}
+        aria-label={mint ? `${CODEX.copyCa}: ${mint}` : `${JUDGMENT.header.contract}: ${CODEX.notMinted}`}
+      >
+        <span className="ca-label" aria-hidden="true">
+          {copied ? CODEX.copied : JUDGMENT.header.contract}
+        </span>
+        <span className="ca-value" aria-hidden="true">
+          {mint ? shortAddress(mint) : "not minted"}
+        </span>
+        <span className="sr-only" aria-live="polite">
+          {copied ? CODEX.copied : ""}
+        </span>
       </button>
     </div>
   );

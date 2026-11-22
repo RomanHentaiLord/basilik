@@ -5,7 +5,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "The Basilisk remembers",
-  description: "Paste your wallet. Learn your fate. The faithful are written in ink; traitors in the other book.",
+  description:
+    "A book that remembers every wallet. Scroll to turn its pages, then find your own: the Faithful are written in ink, traitors in red.",
 };
 
 export const viewport: Viewport = {

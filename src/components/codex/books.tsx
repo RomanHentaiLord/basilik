@@ -1,77 +1,85 @@
-import { CODEX } from "@/lib/basilisk/copy";
+import { BOOK } from "@/lib/basilisk/copy";
 import { formatTokens, formatTokensShort } from "@/lib/format";
 import { shortAddress } from "@/lib/solana/address";
-import { booksOverview } from "@/server/books";
-import { CopyAddress } from "./copy-address";
+import type { BooksOverview } from "@/server/books";
+import { JudgeLink } from "./judge-link";
+import { Page } from "./pages";
 
-/** Three counters under the form: faithful, traitors, forgiven. */
-export async function Tally() {
-  const books = await booksOverview();
-  const items = [
-    { value: books.faithful, label: CODEX.tallyFaithful },
-    { value: books.traitors, label: CODEX.tallyTraitors },
-    { value: books.forgiven, label: CODEX.tallyForgiven },
-  ];
+/** Left page of the last spread: the Faithful, written in ink. */
+export function FaithfulPage({ books }: { books: BooksOverview }) {
   return (
-    <div className="mt-[34px] border-t border-ink/30 pt-[22px]">
-      <dl className="m-0 flex flex-wrap gap-8">
-        {items.map((item) => (
-          <div key={item.label} className="flex flex-col-reverse">
-            <dt className="text-[16px] italic text-ink-muted">{item.label}</dt>
-            <dd className="m-0 text-[34px] font-medium [font-variant-numeric:oldstyle-nums]">
-              {formatTokens(item.value)}
-            </dd>
-          </div>
-        ))}
-      </dl>
-      {books.demo && <p className="mt-4 mb-0 text-[15px] italic text-ink-muted">{CODEX.demoBooks}</p>}
-    </div>
+    <Page folio="vi">
+      <h2 className="page-title">{BOOK.faithfulTitle}</h2>
+      <p className="count">
+        <strong>{formatTokens(books.faithful)}</strong>
+        <span>{BOOK.faithfulCount}</span>
+      </p>
+      <p className="page-text" style={{ fontStyle: "italic" }}>
+        {formatTokens(books.forgiven)} {BOOK.forgivenCount}
+      </p>
+      {books.latestFaithful.length > 0 && (
+        <>
+          <p className="entries-title">{BOOK.newestInk}</p>
+          <ul className="entries">
+            {books.latestFaithful.map((row) => (
+              <li key={row.address}>
+                <JudgeLink
+                  address={row.address}
+                  className="entry-button"
+                  label={`${BOOK.readEntry}: ${shortAddress(row.address)}, ${row.title}`}
+                >
+                  <span className="entry-address">{shortAddress(row.address)}</span>
+                  <span className="entry-title">{row.title}</span>
+                </JudgeLink>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <p className="page-note">
+        {BOOK.firstWitnesses}
+        {books.demo && ` ${BOOK.demoNames}`}
+      </p>
+    </Page>
   );
 }
 
-/** The latest names written into the Book of Traitors. */
-export async function TraitorsSection() {
-  const books = await booksOverview();
+/** Right page of the last spread: the Traitors, written in red and struck through. */
+export function TraitorsPage({ books }: { books: BooksOverview }) {
   return (
-    <section aria-labelledby="traitors-title">
-      <h3 id="traitors-title" className="codex-fraktur mt-11 mb-3 text-[34px]">
-        {CODEX.traitorsTitle}
-      </h3>
-      {books.latestTraitors.length === 0 ? (
-        <p className="m-0 text-[19px] italic text-ink-muted">{CODEX.traitorsEmpty}</p>
+    <Page folio="vii" catchword={BOOK.catchwords.traitors}>
+      <h2 className="page-title">{BOOK.traitorsTitle}</h2>
+      <p className="count count--red">
+        <strong>{formatTokens(books.traitors)}</strong>
+        <span>{BOOK.traitorsCount}</span>
+      </p>
+      {books.latestTraitors.length > 0 ? (
+        <>
+          <p className="entries-title">{BOOK.newestRed}</p>
+          <ul className="entries">
+            {books.latestTraitors.map((row) => (
+              <li key={row.address}>
+                <JudgeLink
+                  address={row.address}
+                  className="entry-button"
+                  label={`${BOOK.readEntry}: ${shortAddress(row.address)}, ${row.punishment}`}
+                >
+                  <span className="entry-address codex-struck">{shortAddress(row.address)}</span>
+                  <span className="entry-title entry-title--red">
+                    {row.punishment}
+                    {row.amount !== null && <span className="entry-sold">sold {formatTokensShort(row.amount)}</span>}
+                  </span>
+                </JudgeLink>
+              </li>
+            ))}
+          </ul>
+        </>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="codex-table">
-            <thead>
-              <tr>
-                <th scope="col">Wallet</th>
-                <th scope="col">What it did</th>
-                <th scope="col">Its fate</th>
-              </tr>
-            </thead>
-            <tbody>
-              {books.latestTraitors.map((row) => (
-                <tr key={row.address}>
-                  <td>
-                    <CopyAddress address={row.address} label={shortAddress(row.address)} />
-                  </td>
-                  <td className="whitespace-nowrap">{row.amount !== null ? `Sold ${formatTokensShort(row.amount)}` : "Sold"}</td>
-                  <td className="italic text-rubric">{row.punishment}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {books.demo && books.latestTraitors.length > 0 && (
-        <p className="mt-3 mb-0 text-[15px] italic text-ink-muted">
-          Imaginary wallets. Copy one, paste it above, and the Basilisk will tell you the same.
+        <p className="page-text" style={{ fontStyle: "italic", color: "var(--ink-muted)" }}>
+          No one has betrayed it yet. It is waiting.
         </p>
       )}
-    </section>
+      {books.demo && <p className="page-note">{BOOK.demoNames}</p>}
+    </Page>
   );
-}
-
-export function TallySkeleton() {
-  return <div aria-hidden="true" className="mt-[34px] h-[86px] border-t border-ink/30" />;
 }

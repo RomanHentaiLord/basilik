@@ -26,10 +26,8 @@ export async function getMarketState(mint: string): Promise<MarketState> {
   }
 
   try {
-    const response = await fetch(
-      `https://api.dexscreener.com/latest/dex/tokens/${mint}`,
-      { cache: "no-store" },
-    );
+    // Called inside a "use cache" scope (sealsOverview), which decides how long this lives.
+    const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`);
     if (!response.ok) throw new Error(`DexScreener HTTP ${response.status}`);
     const data = (await response.json()) as { pairs?: DexPair[] | null };
     const pairs = data.pairs ?? [];

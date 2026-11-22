@@ -1,15 +1,17 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------
-   The Codex: an open book of judgment on a walnut desk.
-   Pigments of a medieval scriptorium: iron-gall ink, vermilion
-   rubric, lapis and gold leaf on aged parchment.
+   The Codex: a leather-bound book of judgment on a walnut desk.
+   Scrolling turns its pages. Pigments of a medieval scriptorium:
+   iron-gall ink, vermilion rubric, lapis and gold leaf on parchment.
    --------------------------------------------------------------- */
 :root {
   --walnut: #22180f;
   --walnut-light: #3a2a1b;
+  --walnut-deep: #140d07;
   --parchment: #ded0ac;
   --parchment-light: #ebe0c2;
+  --parchment-dark: #c8b68b;
   --ink: #2a1e14;
   --ink-muted: #5b4a38;
   --rubric: #a8241b;
@@ -18,6 +20,12 @@
   --gold: #b48a2e;
   --gold-light: #e7c46a;
   --pencil: #57524b;
+  --leather: #4a1813;
+  --leather-dark: #260b08;
+  --header-h: 3.75rem;
+  /* A small tile of fractal noise: paper and leather grain. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .32 0 0 0 0 .22 0 0 0 0 .1 0 0 0 .2 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --grain-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .35 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 @theme inline {
@@ -34,12 +42,28 @@
 }
 
 html {
-  background: var(--walnut);
+  background: var(--walnut-deep);
+  scroll-behavior: smooth;
 }
 
 body {
+  margin: 0;
   font-family: var(--font-garamond), Georgia, serif;
   color: var(--ink);
+}
+
+/* The desk: walnut grain under a candle in the upper left. Fixed, so scrolling never repaints it. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(60% 50% at 18% 6%, rgba(255, 190, 110, 0.14), transparent 70%),
+    radial-gradient(120% 80% at 50% 120%, rgba(0, 0, 0, 0.55), transparent 60%),
+    repeating-linear-gradient(91deg, transparent 0 21px, rgba(0, 0, 0, 0.08) 22px 23px, transparent 24px 57px),
+    repeating-linear-gradient(89deg, transparent 0 9px, rgba(255, 220, 170, 0.025) 10px 11px, transparent 12px 31px),
+    linear-gradient(180deg, var(--walnut-light) 0%, var(--walnut) 45%, var(--walnut-deep) 100%);
 }
 
 ::selection {
@@ -47,50 +71,394 @@ body {
 }
 
 @layer components {
-  .codex-desk {
-    min-height: 100vh;
-    box-sizing: border-box;
-    padding: 56px 24px 40px;
-    background: radial-gradient(120% 90% at 50% 0%, var(--walnut-light) 0%, var(--walnut) 60%, #170f09 100%);
-  }
-
-  .codex-book {
-    position: relative;
-    max-width: 1320px;
-    margin: 0 auto;
-    display: flex;
-    flex-wrap: wrap;
-    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
-  }
-
-  .codex-page {
-    flex: 1 1 520px;
-    min-width: 0;
-    box-sizing: border-box;
-    padding: 64px 60px 72px;
-    background: var(--parchment);
-    position: relative;
-  }
-  .codex-page--left {
-    box-shadow: inset -38px 0 40px -30px rgba(70, 45, 20, 0.55), inset 0 0 80px rgba(120, 90, 40, 0.25);
-  }
-  .codex-page--right {
-    box-shadow: inset 38px 0 40px -30px rgba(70, 45, 20, 0.55), inset 0 0 80px rgba(120, 90, 40, 0.25);
-  }
-
   .codex-fraktur {
     font-family: var(--font-fraktur), var(--font-garamond), serif;
     font-weight: 400;
   }
 
-  /* The illuminated initial: lapis ground, double gold border, a serpent coiled around the letter. */
+  .codex-focus:focus-visible,
+  .codex-input:focus-visible,
+  .codex-button:focus-visible {
+    outline: 3px solid var(--lapis);
+    outline-offset: 3px;
+  }
+
+  .codex-link {
+    color: var(--rubric);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+  .codex-link:hover {
+    color: var(--rubric-dark);
+  }
+
+  .codex-struck {
+    text-decoration: line-through;
+    text-decoration-color: var(--rubric);
+    text-decoration-thickness: 2px;
+  }
+
+  /* ---------------- Header ---------------- */
+  .site-header {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 50;
+    height: var(--header-h);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0 0 0 1.25rem;
+    background: rgba(20, 13, 7, 0.84);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: var(--gold-light);
+    text-decoration: none;
+  }
+  .brand svg {
+    width: 2rem;
+    height: 2rem;
+    flex: none;
+  }
+  .brand-name {
+    font-family: var(--font-fraktur), serif;
+    font-size: 1.5rem;
+    line-height: 1;
+    padding-top: 0.15rem;
+  }
+  .header-actions {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    height: 100%;
+  }
+  .header-actions > a,
+  .header-actions > span {
+    align-self: center;
+  }
+  .header-x {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.5rem;
+    padding: 0 0.95rem;
+    border: 1px solid rgba(231, 196, 106, 0.6);
+    border-radius: 2rem;
+    color: var(--gold-light);
+    font-size: 1.05rem;
+    text-decoration: none;
+    transition: background-color 0.2s, color 0.2s;
+  }
+  .header-x:hover {
+    background: var(--gold-light);
+    color: var(--walnut-deep);
+  }
+  .header-x--soon {
+    opacity: 0.55;
+    cursor: help;
+  }
+  .header-x--soon:hover {
+    background: transparent;
+    color: var(--gold-light);
+  }
+  .header-cta {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.5rem;
+    padding: 0 1.1rem;
+    border-radius: 3px;
+    background: var(--rubric);
+    color: #f6ead0;
+    font-size: 1.05rem;
+    font-weight: 500;
+    text-decoration: none;
+    box-shadow: 0 2px 0 #6e1711;
+    transition: background-color 0.2s;
+  }
+  .header-cta:hover {
+    background: #8f1d16;
+  }
+  .header-cta .short {
+    display: none;
+  }
+
+  /* The red ribbon bookmark hanging from the top right corner: the contract address. */
+  .ca-ribbon {
+    position: relative;
+    flex: none;
+    width: 7.75rem;
+    height: calc(var(--header-h) + 1.4rem);
+    margin-right: 1.25rem;
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.4));
+  }
+  .ca-ribbon button {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.1rem;
+    padding: 0 0.4rem 1.1rem;
+    border: 0;
+    background: linear-gradient(90deg, #861b15, var(--rubric) 45%, #861b15);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 84%, 0 100%);
+    color: #f6ead0;
+    font: inherit;
+    cursor: pointer;
+  }
+  .ca-ribbon button:disabled {
+    cursor: default;
+  }
+  .ca-ribbon button:focus-visible {
+    outline: 2px solid var(--gold-light);
+    outline-offset: -4px;
+  }
+  .ca-label {
+    font-size: 0.85rem;
+    font-style: italic;
+    opacity: 0.85;
+  }
+  .ca-value {
+    font-size: 1.05rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  /* ---------------- The book ---------------- */
+  .book-scroll {
+    position: relative;
+  }
+  .book-scroll--spread {
+    display: none;
+  }
+  .book-stage {
+    position: sticky;
+    top: 0;
+    height: 100svh;
+    box-sizing: border-box;
+    padding-top: var(--header-h);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: clip;
+  }
+
+  .book {
+    position: relative;
+    font-size: var(--fs);
+    perspective: 170em;
+  }
+  .book--spread {
+    --fs: min(calc((100vw - 4rem) / 74), calc((100svh - var(--header-h) - 3rem) / 44));
+    width: 68em;
+    height: 42em;
+  }
+  .book--single {
+    --fs: min(calc((100vw - 1.75rem) / 25), calc((100svh - var(--header-h) - 2.25rem) / 41));
+    width: 24em;
+    height: 40em;
+  }
+
+  /* The back board: leather showing round the page block. */
+  .book-board {
+    position: absolute;
+    top: -0.5em;
+    bottom: -0.5em;
+    left: 50%;
+    right: -0.5em;
+    border-radius: 0 0.45em 0.45em 0;
+    background: var(--grain-dark), linear-gradient(160deg, #5b1f18, var(--leather) 40%, var(--leather-dark));
+    box-shadow: 0 1.4em 2.6em rgba(0, 0, 0, 0.55), 0 0.3em 0.6em rgba(0, 0, 0, 0.4);
+  }
+  .book--single .book-board {
+    left: 0;
+  }
+
+  .book-base {
+    z-index: 0;
+  }
+  .book-base,
+  .leaf {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 50%;
+    height: 100%;
+  }
+  .book--single .book-base,
+  .book--single .leaf {
+    left: 0;
+    width: 100%;
+  }
+  /* Page edges along the fore-edge of the block. */
+  .book-base {
+    box-shadow: 0.1em 0 0 #cbbb92, 0.2em 0 0 #e3d6b4, 0.3em 0 0 #c6b48a, 0.4em 0 0 #dccfab;
+  }
+
+  .leaf {
+    transform-origin: 0% 50%;
+    transform-style: preserve-3d;
+  }
+  /* The front board is a little larger than the pages, like a real cover. */
+  .leaf--cover {
+    top: -0.5em;
+    height: calc(100% + 1em);
+    width: calc(50% + 0.5em);
+  }
+  .book--single .leaf--cover {
+    width: calc(100% + 0.5em);
+  }
+  .leaf-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  .leaf-face--back {
+    transform: rotateY(180deg);
+  }
+  .leaf--cover .leaf-face--back {
+    border-radius: 0.45em 0 0 0.45em;
+    background: var(--grain-dark), linear-gradient(200deg, #5b1f18, var(--leather) 45%, var(--leather-dark));
+    box-shadow: 0 1.4em 2.6em rgba(0, 0, 0, 0.5);
+  }
+  .leaf-shade {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .leaf-shade--front {
+    background: linear-gradient(90deg, rgba(40, 24, 8, 0.55), rgba(40, 24, 8, 0.15));
+  }
+  .leaf-shade--back {
+    background: linear-gradient(270deg, rgba(40, 24, 8, 0.55), rgba(40, 24, 8, 0.15));
+  }
+
+  /* ---------------- Pages ---------------- */
+  .page {
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+    padding: 3.1em 3.2em 2.9em 3.6em;
+    color: var(--ink);
+    background-color: var(--parchment);
+    background-image:
+      var(--grain),
+      radial-gradient(130% 100% at 50% 45%, transparent 58%, rgba(125, 86, 36, 0.3) 100%),
+      linear-gradient(175deg, var(--parchment-light), var(--parchment) 60%);
+    /* Right-hand page: the spine is on the left. */
+    box-shadow: inset 2.4em 0 2.2em -1.9em rgba(70, 45, 20, 0.55);
+  }
+  .leaf-face--back .page {
+    padding: 3.1em 3.6em 2.9em 3.2em;
+    box-shadow: inset -2.4em 0 2.2em -1.9em rgba(70, 45, 20, 0.55), -0.1em 0 0 #cbbb92, -0.2em 0 0 #e3d6b4, -0.3em 0 0 #c6b48a;
+  }
+  .page-frame {
+    position: absolute;
+    inset: 1.6em 1.8em 1.6em 2.2em;
+    border: 1px solid rgba(168, 36, 27, 0.3);
+    pointer-events: none;
+  }
+  .page-frame::before {
+    content: "";
+    position: absolute;
+    inset: 0.3em;
+    border: 1px solid rgba(168, 36, 27, 0.16);
+  }
+  .leaf-face--back .page-frame {
+    inset: 1.6em 2.2em 1.6em 1.8em;
+  }
+  .folio {
+    position: absolute;
+    top: 0.45em;
+    right: 2em;
+    font-size: 0.82em;
+    font-style: italic;
+    color: var(--rubric);
+  }
+  .leaf-face--back .folio {
+    right: auto;
+    left: 2em;
+  }
+  .catchword {
+    position: absolute;
+    bottom: 0.4em;
+    right: 2em;
+    font-size: 0.85em;
+    font-style: italic;
+    color: var(--ink-muted);
+  }
+  .leaf-face--back .catchword {
+    display: none;
+  }
+  .page-body {
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    font-size: 1.05em;
+    line-height: 1.42;
+  }
+  .book--spread .page-body {
+    font-size: 1.12em;
+  }
+  .book--single .page-body {
+    font-size: 0.98em;
+  }
+  .book--single .order-list li {
+    padding: 0.38em 0 0.42em;
+  }
+  .page-kicker {
+    margin: 0 0 0.7em;
+    font-style: italic;
+    color: var(--rubric);
+  }
+  .page-title {
+    margin: 0 0 0.4em;
+    font-family: var(--font-fraktur), serif;
+    font-weight: 400;
+    font-size: 2.05em;
+    line-height: 1.05;
+  }
+  .page-text {
+    margin: 0 0 0.75em;
+  }
+  .page-note {
+    margin: auto 0 0;
+    padding-top: 0.8em;
+    font-size: 0.86em;
+    font-style: italic;
+    color: var(--ink-muted);
+  }
+  .rubric-line {
+    margin: 0.2em 0 0.8em;
+    font-style: italic;
+    font-size: 1.12em;
+    color: var(--rubric);
+  }
+
+  /* Illuminated initial: lapis ground, double gold border, a serpent coiled around the letter. */
+  .initial-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75em;
+    margin-bottom: 0.9em;
+  }
   .codex-initial {
     position: relative;
-    flex: 0 0 128px;
-    height: 128px;
+    flex: 0 0 5.4em;
+    height: 5.4em;
     background: var(--lapis);
-    border: 3px solid var(--gold);
-    box-shadow: inset 0 0 0 6px var(--lapis), inset 0 0 0 8px var(--gold);
+    border: 0.14em solid var(--gold);
+    box-shadow: inset 0 0 0 0.28em var(--lapis), inset 0 0 0 0.36em var(--gold);
   }
   .codex-initial svg {
     position: absolute;
@@ -104,21 +472,797 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding-bottom: 6px;
+    padding-bottom: 0.08em;
     font-family: var(--font-fraktur), serif;
-    font-size: 96px;
+    font-size: 4.1em;
     line-height: 1;
     color: var(--gold-light);
   }
-
   .codex-title {
-    margin: 6px 0 0;
+    margin: 0.1em 0 0;
     font-family: var(--font-fraktur), serif;
     font-weight: 400;
-    font-size: clamp(40px, 4.6vw, 64px);
+    font-size: 2.55em;
     line-height: 1.02;
-    letter-spacing: 0.5px;
-    animation: codex-ink 2.6s cubic-bezier(0.3, 0.6, 0.2, 1) 0.2s both;
+  }
+
+  /* The table of contents on the first page. Each line turns the book to its chapter.
+     (Not ".contents": Tailwind owns that name as a display utility.) */
+  .toc {
+    margin: 0.4em 0 0;
+  }
+  .contents-title {
+    margin: 0 0 0.25em;
+    font-size: 0.86em;
+    font-style: italic;
+    color: var(--rubric);
+  }
+  .toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .contents-line {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4em;
+    width: 100%;
+    padding: 0.18em 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .contents-line::after {
+    content: "";
+    order: 1;
+    flex: 1;
+    border-bottom: 1px dotted rgba(42, 30, 20, 0.45);
+    transform: translateY(-0.25em);
+  }
+  .contents-line .name {
+    order: 0;
+  }
+  .contents-line .where {
+    order: 2;
+    font-style: italic;
+    color: var(--rubric);
+  }
+  .contents-line:hover .name {
+    color: var(--rubric);
+  }
+  .contents-line:focus-visible {
+    outline: 2px solid var(--lapis);
+    outline-offset: 2px;
+  }
+
+  /* A pointing hand in the margin. */
+  .manicule {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin-top: auto;
+    padding: 0.2em 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-style: italic;
+    color: var(--rubric);
+    text-align: left;
+    cursor: pointer;
+  }
+  .manicule:hover span {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  .manicule:focus-visible {
+    outline: 2px solid var(--lapis);
+    outline-offset: 2px;
+  }
+  .manicule svg {
+    width: 2.2em;
+    height: 1.3em;
+    flex: none;
+  }
+
+  /* ---------------- Cover ---------------- */
+  .page--cover {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2em;
+    border-radius: 0 0.45em 0.45em 0;
+    text-align: center;
+    color: var(--gold-light);
+    background:
+      var(--grain-dark),
+      radial-gradient(120% 90% at 35% 25%, #6d251c 0%, var(--leather) 45%, var(--leather-dark) 100%);
+    box-shadow: inset 0.9em 0 1.1em -0.6em rgba(0, 0, 0, 0.65), inset 0 0 0 0.25em rgba(0, 0, 0, 0.18);
+  }
+  .page--cover::before {
+    /* The hinge groove along the spine. */
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 1.5em;
+    width: 0.25em;
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0.45), rgba(255, 210, 160, 0.08));
+  }
+  .cover-frame {
+    position: absolute;
+    inset: 1.7em 1.6em 1.7em 2.6em;
+    border: 0.12em solid rgba(231, 196, 106, 0.7);
+    box-shadow: inset 0 0 0 0.45em transparent, inset 0 0 0 0.53em rgba(231, 196, 106, 0.4);
+    pointer-events: none;
+  }
+  .cover-frame svg {
+    position: absolute;
+    width: 2.6em;
+    height: 2.6em;
+  }
+  .cover-corner {
+    position: absolute;
+    width: 3.4em;
+    height: 3.4em;
+    background: linear-gradient(135deg, #f1d58a, #a57a28 45%, #6e4f17);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+  }
+  .cover-corner--top {
+    top: 0;
+    right: 0;
+    border-top-right-radius: 0.45em;
+    clip-path: polygon(0 0, 100% 0, 100% 100%);
+  }
+  .cover-corner--bottom {
+    bottom: 0;
+    right: 0;
+    border-bottom-right-radius: 0.45em;
+    clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  }
+  .cover-emblem {
+    width: 11em;
+    height: 11em;
+    margin: 0.4em 0 0.8em;
+  }
+  .gilt {
+    background: linear-gradient(180deg, #f7df95 0%, #d4a845 45%, #9a7124 70%, #e5c26c 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .cover-title {
+    margin: 0;
+    font-family: var(--font-fraktur), serif;
+    font-weight: 400;
+    line-height: 1;
+    filter: drop-shadow(0 0.05em 0 rgba(0, 0, 0, 0.6));
+  }
+  .cover-title span {
+    display: block;
+  }
+  .cover-title span:first-child {
+    font-size: 3.5em;
+  }
+  .cover-title span:last-child {
+    font-size: 2.5em;
+    margin-top: 0.1em;
+  }
+  .book--single .cover-title span:first-child {
+    font-size: 3em;
+  }
+  .cover-sub {
+    margin: 1.1em 0 0;
+    font-style: italic;
+    font-size: 1.05em;
+    color: rgba(231, 196, 106, 0.85);
+  }
+  .cover-hint {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 2.7em;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3em;
+    font-style: italic;
+    color: rgba(240, 214, 150, 0.9);
+  }
+  .cover-hint svg {
+    width: 1.4em;
+    height: 1.4em;
+    animation: hint-bob 1.8s ease-in-out infinite;
+  }
+
+  /* ---------------- Endpaper ---------------- */
+  .page--endpaper {
+    inset: 0.5em 0 0.5em 0.5em;
+    padding: 0;
+    background: #31466f;
+    box-shadow: inset -1.4em 0 1.6em -1em rgba(0, 0, 0, 0.45);
+  }
+  .leaf-face--back .page.page--endpaper {
+    padding: 0;
+    box-shadow: inset -1.4em 0 1.6em -1em rgba(0, 0, 0, 0.45);
+  }
+  .book--single .page--endpaper {
+    inset: 0;
+    box-shadow: inset 1.6em 0 1.6em -1.1em rgba(0, 0, 0, 0.5);
+  }
+  /* On phones a leaf's back shows only while it turns: plain paper. */
+  .book--single .leaf:not(.leaf--cover) .leaf-face--back {
+    background: var(--grain), linear-gradient(175deg, var(--parchment-light), var(--parchment));
+  }
+  .marble {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .bookplate {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 15.5em;
+    transform: translate(-50%, -50%);
+    box-sizing: border-box;
+    padding: 1.7em 1.5em 1.5em;
+    text-align: center;
+    background: var(--grain), linear-gradient(175deg, var(--parchment-light), var(--parchment));
+    box-shadow: 0 0.3em 0.9em rgba(0, 0, 0, 0.45), inset 0 0 0 0.35em var(--parchment-light), inset 0 0 0 calc(0.35em + 1px) var(--rubric);
+  }
+  .bookplate svg {
+    width: 3.6em;
+    height: 3.6em;
+    margin: 0.3em auto 0.4em;
+    display: block;
+  }
+  .bookplate-ex {
+    margin: 0;
+    font-style: italic;
+    color: var(--rubric);
+  }
+  .bookplate-name {
+    margin: 0.05em 0 0;
+    font-family: var(--font-fraktur), serif;
+    font-size: 2.1em;
+    line-height: 1.05;
+  }
+  .bookplate-text {
+    margin: 0.4em 0 0;
+    font-size: 0.98em;
+    line-height: 1.4;
+  }
+
+  /* ---------------- The Order ---------------- */
+  .order-list {
+    list-style: none;
+    margin: 0.2em 0 0;
+    padding: 0;
+  }
+  .order-list li {
+    padding: 0.5em 0 0.55em;
+    border-top: 1px solid rgba(42, 30, 20, 0.2);
+  }
+  .order-list li:last-child {
+    border-bottom: 1px solid rgba(42, 30, 20, 0.2);
+  }
+  .order-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.6em;
+  }
+  .order-name {
+    font-family: var(--font-fraktur), serif;
+    font-size: 1.45em;
+    line-height: 1.1;
+  }
+  .order-floor {
+    font-size: 0.86em;
+    font-style: italic;
+    color: var(--rubric);
+    white-space: nowrap;
+  }
+  .order-fate {
+    margin: 0.15em 0 0;
+    font-size: 0.92em;
+    line-height: 1.35;
+    color: var(--ink-muted);
+  }
+
+  /* ---------------- Weigh your devotion ---------------- */
+  .weigh-field {
+    margin-top: 0.4em;
+  }
+  .weigh-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-style: italic;
+    color: var(--ink-muted);
+    font-size: 0.92em;
+  }
+  .weigh-value {
+    font-style: normal;
+    font-size: 1.35em;
+    font-weight: 500;
+    color: var(--ink);
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+  .weigh-range {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    width: 100%;
+    height: 2em;
+    margin: 0.2em 0 0;
+    background: transparent;
+    cursor: pointer;
+  }
+  .weigh-range::-webkit-slider-runnable-track {
+    height: 0.24em;
+    border-radius: 1em;
+    background: linear-gradient(90deg, var(--rubric) var(--fill), rgba(42, 30, 20, 0.28) var(--fill));
+  }
+  .weigh-range::-moz-range-track {
+    height: 0.24em;
+    border-radius: 1em;
+    background: linear-gradient(90deg, var(--rubric) var(--fill), rgba(42, 30, 20, 0.28) var(--fill));
+  }
+  .weigh-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 1.5em;
+    height: 1.5em;
+    margin-top: -0.63em;
+    border: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 32%, #cf4b40, #9e1b1b 50%, #680f0f);
+    box-shadow: 0 0.12em 0.25em rgba(0, 0, 0, 0.4);
+  }
+  .weigh-range::-moz-range-thumb {
+    width: 1.5em;
+    height: 1.5em;
+    border: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 32%, #cf4b40, #9e1b1b 50%, #680f0f);
+    box-shadow: 0 0.12em 0.25em rgba(0, 0, 0, 0.4);
+  }
+  .weigh-range:focus-visible {
+    outline: 2px solid var(--lapis);
+    outline-offset: 0.3em;
+  }
+  .weigh-ticks {
+    position: relative;
+    height: 1.3em;
+    font-size: 0.78em;
+    font-style: italic;
+    color: var(--ink-muted);
+  }
+  .weigh-ticks span {
+    position: absolute;
+    top: 0;
+    left: calc(0.95em + var(--p) * (100% - 1.9em));
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+  .weigh-ticks span::before {
+    content: "";
+    position: absolute;
+    top: -0.55em;
+    left: 50%;
+    width: 1px;
+    height: 0.4em;
+    background: rgba(42, 30, 20, 0.45);
+  }
+  .deeds {
+    display: flex;
+    margin: 0.35em 0 0;
+    padding: 0;
+    border: 1px solid var(--ink);
+    border-radius: 0.25em;
+    overflow: hidden;
+  }
+  .deeds legend {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .deeds label {
+    flex: 1;
+    position: relative;
+    text-align: center;
+    padding: 0.4em 0.2em;
+    font-size: 0.92em;
+    cursor: pointer;
+    border-left: 1px solid rgba(42, 30, 20, 0.35);
+    transition: background-color 0.15s;
+  }
+  .deeds label:first-of-type {
+    border-left: 0;
+  }
+  .deeds input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .deeds label:has(input:checked) {
+    background: var(--ink);
+    color: var(--parchment-light);
+  }
+  .deeds label:has(input:focus-visible) {
+    outline: 2px solid var(--lapis);
+    outline-offset: -3px;
+  }
+  .weigh-result {
+    margin-top: 0.9em;
+    padding: 0.75em 0.9em 0.8em;
+    border: 1px solid rgba(168, 36, 27, 0.35);
+    background: rgba(255, 248, 228, 0.35);
+  }
+  .weigh-result--red {
+    border-color: var(--rubric);
+    background: rgba(168, 36, 27, 0.06);
+  }
+  .weigh-result--pencil {
+    border-style: dashed;
+    border-color: var(--pencil);
+  }
+  .weigh-result--outside {
+    border-color: rgba(42, 30, 20, 0.3);
+  }
+  .weigh-would {
+    margin: 0;
+    font-size: 0.86em;
+    font-style: italic;
+    color: var(--rubric);
+  }
+  .weigh-title {
+    margin: 0.05em 0 0.15em;
+    font-family: var(--font-fraktur), serif;
+    font-size: 1.65em;
+    line-height: 1.08;
+  }
+  .weigh-fate {
+    margin: 0;
+    font-size: 0.95em;
+    line-height: 1.38;
+  }
+  .weigh-hint {
+    margin: 0.35em 0 0;
+    font-size: 0.88em;
+    font-style: italic;
+    color: var(--ink-muted);
+  }
+
+  /* ---------------- Seals ---------------- */
+  .seal-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.9em 0.4em;
+    list-style: none;
+    margin: 0.4em 0 0;
+    padding: 0;
+  }
+  .seal-grid li {
+    width: 23%;
+  }
+  .seal-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35em;
+    width: 100%;
+    padding: 0.2em 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+  .seal-button:focus-visible {
+    outline: 2px solid var(--lapis);
+    outline-offset: 0.1em;
+    border-radius: 0.3em;
+  }
+  .seal-caption {
+    font-size: 0.74em;
+    line-height: 1.2;
+    text-align: center;
+    color: var(--ink-muted);
+  }
+  .seal-button[aria-pressed="true"] .seal-caption {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .codex-wax {
+    position: relative;
+    width: 3.7em;
+    height: 3.7em;
+    flex: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 38% 32%, #c8443a 0%, #9e1b1b 45%, #6a0f0f 100%);
+    box-shadow: 0 0 0 0.14em rgba(106, 15, 15, 0.35), 0.1em 0.14em 0 rgba(50, 10, 5, 0.35);
+    font-size: 1em;
+    font-weight: 600;
+    color: #f1d6b8;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .codex-wax span {
+    font-size: 1.1em;
+  }
+  .codex-wax--broken {
+    background: radial-gradient(circle at 38% 32%, #a9473d 0%, #7e1a17 50%, #4e0c0b 100%);
+    color: #d9b79a;
+  }
+  .codex-wax .codex-crack {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .codex-wax .codex-crack path {
+    fill: none;
+    stroke: #2a0605;
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+  .codex-wax--next {
+    animation: codex-breathe 3.6s ease-in-out infinite;
+  }
+  .seal-button:hover .codex-wax {
+    transform: translateY(-0.1em);
+  }
+  .seal-button[aria-pressed="true"] .codex-wax {
+    box-shadow: 0 0 0 0.14em var(--parchment), 0 0 0 0.3em var(--gold), 0.1em 0.2em 0.3em rgba(50, 10, 5, 0.35);
+  }
+  .book--spread .seal-grid .codex-wax {
+    width: 4.3em;
+    height: 4.3em;
+  }
+  .codex-wax--large {
+    width: 5.6em;
+    height: 5.6em;
+  }
+  .codex-wax--large span {
+    font-size: 1.7em;
+  }
+
+  .mcap {
+    margin-top: auto;
+  }
+  .mcap-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5em;
+    font-size: 0.9em;
+  }
+  .mcap-row strong {
+    font-size: 1.3em;
+    font-weight: 500;
+  }
+  .ink-bar {
+    height: 0.3em;
+    margin: 0.35em 0 0.3em;
+    background: rgba(42, 30, 20, 0.16);
+  }
+  .ink-bar span {
+    display: block;
+    height: 100%;
+    width: var(--p);
+    background: linear-gradient(90deg, var(--rubric-dark), var(--rubric));
+  }
+  .mcap-to {
+    font-size: 0.82em;
+    font-style: italic;
+    color: var(--ink-muted);
+  }
+
+  .reading-head {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    margin-bottom: 0.7em;
+  }
+  .reading-state {
+    margin: 0.2em 0 0;
+    font-style: italic;
+    color: var(--rubric);
+  }
+  .prophecy {
+    margin-top: 0.6em;
+    padding-left: 0.9em;
+    border-left: 0.18em double var(--rubric);
+  }
+  .prophecy p {
+    margin: 0;
+  }
+  .prophecy .to {
+    font-size: 0.86em;
+    font-style: italic;
+    color: var(--rubric);
+  }
+  .prophecy .words {
+    margin: 0.1em 0 0.7em;
+    font-size: 1.06em;
+    line-height: 1.4;
+  }
+
+  /* ---------------- The Books ---------------- */
+  .count {
+    display: flex;
+    align-items: baseline;
+    gap: 0.45em;
+    margin: 0.2em 0 0.3em;
+  }
+  .count strong {
+    font-size: 3.1em;
+    font-weight: 500;
+    line-height: 1;
+    font-variant-numeric: oldstyle-nums;
+  }
+  .count span {
+    font-style: italic;
+    color: var(--ink-muted);
+  }
+  .count--red strong {
+    color: var(--rubric);
+  }
+  .entries-title {
+    margin: 0.9em 0 0.25em;
+    font-size: 0.86em;
+    font-style: italic;
+    color: var(--ink-muted);
+  }
+  .entries {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .entries li {
+    border-top: 1px solid rgba(42, 30, 20, 0.18);
+  }
+  .entries li:last-child {
+    border-bottom: 1px solid rgba(42, 30, 20, 0.18);
+  }
+  .entry-button {
+    display: flex;
+    width: 100%;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.6em;
+    padding: 0.42em 0.2em;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.15s;
+  }
+  .entry-button:hover {
+    background: rgba(255, 248, 228, 0.45);
+  }
+  .entry-button:focus-visible {
+    outline: 2px solid var(--lapis);
+    outline-offset: -2px;
+  }
+  .entry-address {
+    font-size: 0.95em;
+    white-space: nowrap;
+  }
+  .entry-title {
+    font-size: 0.92em;
+    text-align: right;
+  }
+  .entry-title--red {
+    font-style: italic;
+    color: var(--rubric);
+  }
+  .entry-sold {
+    display: block;
+    font-size: 0.85em;
+    font-style: normal;
+    color: var(--ink-muted);
+  }
+
+  /* ---------------- Thumb index ---------------- */
+  .thumb-index {
+    position: absolute;
+    top: 3.2em;
+    left: calc(100% + 0.5em);
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .thumb-tab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5em;
+    height: 3em;
+    padding: 0 0.15em 0 0;
+    border: 0;
+    border-radius: 0 0.45em 0.45em 0;
+    background: var(--grain), linear-gradient(90deg, #bba878, var(--parchment-dark) 40%, var(--parchment));
+    box-shadow: 0.1em 0.15em 0.3em rgba(0, 0, 0, 0.35);
+    font: 500 0.95em var(--font-garamond), Georgia, serif;
+    color: var(--ink);
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s, color 0.2s;
+  }
+  .thumb-tab:hover {
+    transform: translateX(0.2em);
+  }
+  .thumb-tab[aria-current="true"] {
+    background: linear-gradient(90deg, var(--rubric-dark), var(--rubric));
+    color: #f6ead0;
+  }
+  .thumb-tab:focus-visible {
+    outline: 2px solid var(--gold-light);
+    outline-offset: 2px;
+  }
+
+  /* ---------------- Your page ---------------- */
+  .judgment {
+    position: relative;
+    box-sizing: border-box;
+    min-height: 100svh;
+    padding: calc(var(--header-h) + 3rem) 1rem 2.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    scroll-margin-top: 0;
+  }
+  .sheet {
+    position: relative;
+    box-sizing: border-box;
+    width: min(100%, 54rem);
+    padding: 3.6rem 3.8rem 3.2rem;
+    background-color: var(--parchment);
+    background-image:
+      var(--grain),
+      radial-gradient(130% 100% at 50% 40%, transparent 62%, rgba(125, 86, 36, 0.28) 100%),
+      linear-gradient(175deg, var(--parchment-light), var(--parchment) 60%);
+    box-shadow: 0 1.6rem 3rem rgba(0, 0, 0, 0.55), 0 0.3rem 0.7rem rgba(0, 0, 0, 0.35);
+  }
+  .sheet .page-frame {
+    inset: 1.2rem 1.4rem;
+  }
+  .sheet-kicker {
+    margin: 0 0 0.4rem;
+    font-size: 1.15rem;
+    font-style: italic;
+    color: var(--rubric);
+  }
+  .sheet-title {
+    margin: 0;
+    font-family: var(--font-fraktur), serif;
+    font-weight: 400;
+    font-size: clamp(2.6rem, 6vw, 4rem);
+    line-height: 1.02;
+  }
+  .sheet-lede {
+    margin: 0.9rem 0 1.8rem;
+    max-width: 34em;
+    font-size: 1.35rem;
+    line-height: 1.5;
   }
 
   .codex-input {
@@ -159,28 +1303,11 @@ body {
     opacity: 0.75;
   }
 
-  .codex-focus:focus-visible,
-  .codex-input:focus-visible,
-  .codex-button:focus-visible {
-    outline: 3px solid var(--lapis);
-    outline-offset: 3px;
-  }
-
-  .codex-link {
-    color: var(--rubric);
-    text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 3px;
-  }
-  .codex-link:hover {
-    color: var(--rubric-dark);
-  }
-
-  /* A verdict, written into the book. */
+  /* A verdict, written onto the page. */
   .codex-entry {
     position: relative;
-    margin-top: 34px;
-    padding: 28px 30px 26px;
+    margin-top: 2.2rem;
+    padding: 2rem 2.1rem 1.9rem;
     background: rgba(255, 248, 228, 0.35);
     border: 1px solid rgba(168, 36, 27, 0.35);
   }
@@ -195,125 +1322,136 @@ body {
   .codex-entry--outside {
     border-color: rgba(42, 30, 20, 0.3);
   }
-
-  /* Wax seals */
-  .codex-wax {
-    position: relative;
-    width: 78px;
-    height: 78px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: radial-gradient(circle at 38% 32%, #c8443a 0%, #9e1b1b 45%, #6a0f0f 100%);
-    box-shadow: 0 0 0 3px rgba(106, 15, 15, 0.35), 2px 3px 0 rgba(50, 10, 5, 0.35);
-    font: 600 24px var(--font-garamond), Georgia, serif;
-    color: #f1d6b8;
+  .entry-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: 1rem 1.6rem;
+    margin: 1.4rem 0 0;
   }
-  .codex-wax--broken {
-    background: radial-gradient(circle at 38% 32%, #a9473d 0%, #7e1a17 50%, #4e0c0b 100%);
-    color: #d9b79a;
-  }
-  .codex-wax .codex-crack {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-  }
-  .codex-wax .codex-crack path {
-    fill: none;
-    stroke: #2a0605;
-    stroke-width: 3;
-    stroke-linecap: round;
-  }
-  .codex-wax--fresh .codex-crack path {
-    stroke-dasharray: 120;
-    stroke-dashoffset: 120;
-    animation: codex-crack 1.2s ease-in 1.2s forwards;
-  }
-  .codex-wax--next {
-    animation: codex-breathe 3.6s ease-in-out infinite;
-  }
-
-  /* The red ribbon bookmark that holds the contract address. */
-  .codex-ribbon {
-    position: absolute;
-    top: -10px;
-    right: 48px;
-    z-index: 2;
-    width: 132px;
-    padding: 34px 0 30px;
-    background: linear-gradient(90deg, #8f1d16, var(--rubric) 45%, #8f1d16);
-    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 84%, 0 100%);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-    display: flex;
-    justify-content: center;
-  }
-  .codex-ribbon button {
-    min-height: 44px;
-    padding: 0 10px;
-    border: 0;
-    background: transparent;
-    color: #f3e7c9;
-    font: 500 18px var(--font-garamond), Georgia, serif;
-    cursor: pointer;
-  }
-  .codex-ribbon button:disabled {
-    cursor: default;
+  .entry-stats dt {
+    font-size: 0.95rem;
     font-style: italic;
-    font-size: 16px;
-  }
-  .codex-ribbon button:focus-visible {
-    outline: 2px solid var(--gold-light);
-    outline-offset: 2px;
-  }
-
-  .codex-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 18px;
-  }
-  .codex-table th {
-    text-align: left;
-    font-weight: 500;
-    font-style: italic;
-    font-size: 15px;
     color: var(--ink-muted);
-    padding: 0 8px 8px 0;
-    border-bottom: 1px solid rgba(42, 30, 20, 0.35);
   }
-  .codex-table td {
-    padding: 10px 8px 10px 0;
-    border-bottom: 1px solid rgba(42, 30, 20, 0.15);
-    vertical-align: top;
+  .entry-stats dd {
+    margin: 0.1rem 0 0;
+    font-size: 1.2rem;
+    font-weight: 500;
+    line-height: 1.3;
   }
-  .codex-struck {
-    text-decoration: line-through;
-    text-decoration-color: var(--rubric);
-    text-decoration-thickness: 2px;
+  .entry-stats .full {
+    grid-column: 1 / -1;
+  }
+  .entry-stats dd small {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 400;
+    font-style: italic;
+    color: var(--ink-muted);
+  }
+  .wax-stamp {
+    position: absolute;
+    top: -2.2rem;
+    right: -1.2rem;
+    width: 6.4rem;
+    height: 6.4rem;
+    pointer-events: none;
+  }
+  .entry-prophecy {
+    margin-top: 1.6rem;
+    padding-left: 1.2rem;
+    border-left: 3px double var(--rubric);
+  }
+  .entry-prophecy p {
+    margin: 0;
+  }
+
+  .colophon {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    max-width: 54rem;
+    margin: 2.5rem auto 0;
+    padding: 0 1.25rem 2.5rem;
+    font-size: 1rem;
+    font-style: italic;
+    color: #cdbb92;
+  }
+  .colophon a {
+    color: var(--gold-light);
+    text-underline-offset: 4px;
+  }
+  .colophon a:hover {
+    color: #f3d98f;
+  }
+
+  /* ---------------- Modes ---------------- */
+  @media (min-width: 900px) and (min-aspect-ratio: 1/1) {
+    .book-scroll--spread {
+      display: block;
+    }
+    .book-scroll--single {
+      display: none;
+    }
   }
 
   @media (max-width: 640px) {
-    .codex-desk {
-      padding: 0 0 32px;
+    :root {
+      --header-h: 3.4rem;
     }
-    .codex-page {
-      padding: 56px 24px 48px;
+    .site-header {
+      padding-left: 0.85rem;
+      gap: 0.5rem;
     }
-    .codex-initial {
-      flex-basis: 88px;
-      height: 88px;
+    .brand-name {
+      display: none;
     }
-    .codex-initial span {
-      font-size: 64px;
+    .header-actions {
+      gap: 0.45rem;
     }
-    .codex-page--left {
-      padding-top: 120px;
+    .header-x {
+      padding: 0 0.75rem;
+      font-size: 0.95rem;
     }
-    .codex-ribbon {
-      right: 16px;
-      width: 112px;
-      padding: 26px 0 24px;
+    .header-x .long {
+      display: none;
+    }
+    .header-cta {
+      padding: 0 0.8rem;
+      font-size: 0.98rem;
+    }
+    .header-cta .long {
+      display: none;
+    }
+    .header-cta .short {
+      display: inline;
+    }
+    .ca-ribbon {
+      width: 6rem;
+      margin-right: 0.6rem;
+    }
+    .ca-value {
+      font-size: 0.92rem;
+    }
+    .sheet {
+      padding: 2.8rem 1.5rem 2.2rem;
+    }
+    .sheet .page-frame {
+      inset: 0.75rem;
+    }
+    .sheet-lede {
+      font-size: 1.2rem;
+    }
+    .codex-entry {
+      padding: 1.6rem 1.2rem 1.5rem;
+    }
+    .wax-stamp {
+      width: 5rem;
+      height: 5rem;
+      top: -1.8rem;
+      right: -0.6rem;
     }
   }
 }
@@ -327,38 +1465,74 @@ body {
   }
 }
 
-@keyframes codex-crack {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
 @keyframes codex-breathe {
   0%,
   100% {
-    box-shadow: 0 0 0 3px rgba(106, 15, 15, 0.35), 2px 3px 0 rgba(50, 10, 5, 0.35);
+    box-shadow: 0 0 0 0.14em rgba(106, 15, 15, 0.35), 0.1em 0.14em 0 rgba(50, 10, 5, 0.35);
   }
   50% {
-    box-shadow: 0 0 0 3px rgba(106, 15, 15, 0.35), 0 0 26px 6px rgba(231, 196, 106, 0.55);
+    box-shadow: 0 0 0 0.14em rgba(106, 15, 15, 0.35), 0 0 1.3em 0.3em rgba(231, 196, 106, 0.6);
   }
 }
 
-@keyframes codex-quill {
+@keyframes hint-bob {
   0%,
   100% {
-    opacity: 0.25;
+    transform: translateY(0);
+    opacity: 0.6;
   }
   50% {
+    transform: translateY(0.35em);
     opacity: 1;
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .codex-title,
-  .codex-wax--next,
-  .codex-wax--fresh .codex-crack path {
+/* Without motion (or without JavaScript) the book lies open page after page, no turning. */
+@media (prefers-reduced-motion: reduce), (scripting: none) {
+  html {
+    scroll-behavior: auto;
+  }
+  .book-scroll--spread {
+    display: none !important;
+  }
+  .book-scroll--single {
+    display: block !important;
+    height: auto !important;
+  }
+  .book-stage {
+    position: static;
+    height: auto;
+    display: block;
+    padding: calc(var(--header-h) + 1.5rem) 0.75rem 0;
+    overflow: visible;
+  }
+  .book--single {
+    --fs: min(calc((100vw - 1.75rem) / 25), 18px);
+    height: auto;
+    margin: 0 auto;
+    perspective: none;
+    transform: none !important;
+  }
+  .book--single .book-board,
+  .leaf-face--back,
+  .leaf-shade,
+  .cover-hint {
+    display: none;
+  }
+  .book--single .leaf,
+  .book--single .book-base {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: 100%;
+    height: 40em;
+    margin-bottom: 1.25em;
+    transform: none !important;
+    visibility: visible !important;
+    z-index: auto !important;
+    box-shadow: 0 0.8em 1.6em rgba(0, 0, 0, 0.45);
+  }
+  .codex-wax--next {
     animation: none;
-    clip-path: none;
-    stroke-dashoffset: 0;
   }
 }

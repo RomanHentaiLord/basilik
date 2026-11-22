@@ -16,11 +16,19 @@ export interface TraitorRow {
   at: number | null;
 }
 
+export interface FaithfulRow {
+  address: string;
+  title: string;
+  /** Forgiven wallets keep a scar in the Book. */
+  scar: boolean;
+}
+
 export interface BooksOverview {
   demo: boolean;
   faithful: number;
   traitors: number;
   forgiven: number;
+  latestFaithful: FaithfulRow[];
   latestTraitors: TraitorRow[];
 }
 
@@ -66,11 +74,17 @@ async function demoBooks(): Promise<BooksOverview> {
       at: verdict.traitorAt,
     }));
 
+  const faithful = verdicts
+    .filter((verdict) => verdict.status === "faithful" || verdict.status === "forgiven")
+    .slice(0, 5)
+    .map((verdict) => ({ address: verdict.address, title: verdict.title, scar: verdict.scar }));
+
   return {
     demo: true,
     faithful: verdicts.filter((verdict) => verdict.book === "faithful").length,
     traitors: verdicts.filter((verdict) => verdict.status === "traitor").length,
     forgiven: verdicts.filter((verdict) => verdict.status === "forgiven").length,
+    latestFaithful: faithful,
     latestTraitors: traitors,
   };
 }
@@ -78,5 +92,5 @@ async function demoBooks(): Promise<BooksOverview> {
 /** Counters and the latest traitors. Real data arrives in stage 2 (database + indexer). */
 export async function booksOverview(): Promise<BooksOverview> {
   if (!tokenMint()) return demoBooks();
-  return { demo: false, faithful: 0, traitors: 0, forgiven: 0, latestTraitors: [] };
+  return { demo: false, faithful: 0, traitors: 0, forgiven: 0, latestFaithful: [], latestTraitors: [] };
 }
