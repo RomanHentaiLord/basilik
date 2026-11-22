@@ -32,13 +32,17 @@ const BOOK_LINE: Record<Verdict["status"], string> = {
 interface Props {
   verdict: Verdict;
   sealsBroken: number;
+  /** This wallet is the one the visitor keeps as their own on this device. */
+  isMine: boolean;
+  onRemember: () => void;
+  onForget: () => void;
   onReset: () => void;
 }
 
 type Reveal = { initial?: TargetAndTransition; animate?: TargetAndTransition; transition?: Transition };
 
 /** One judgment, written onto the page: ink spreads, the title is inked in, the seal is pressed last. */
-export function VerdictEntry({ verdict, sealsBroken, onReset }: Props) {
+export function VerdictEntry({ verdict, sealsBroken, isMine, onRemember, onForget, onReset }: Props) {
   const reduce = useReducedMotion();
   const [now] = useState(() => Date.now());
   const isTraitor = verdict.status === "traitor";
@@ -101,6 +105,16 @@ export function VerdictEntry({ verdict, sealsBroken, onReset }: Props) {
         </motion.h3>
       </div>
 
+      {verdict.entryNumber !== null && (
+        <motion.p {...ink(0.7)} className={`entry-place${verdict.firstWitness && !isTraitor ? " entry-place--gilt" : ""}`}>
+          {isTraitor
+            ? JUDGMENT.struckFrom(verdict.entryNumber)
+            : verdict.firstWitness
+              ? JUDGMENT.firstWitness(verdict.entryNumber)
+              : JUDGMENT.entryNo(verdict.entryNumber)}
+        </motion.p>
+      )}
+
       <motion.p {...ink(0.9)} className={`m-0 text-[21px] leading-normal ${isPencil ? "text-pencil italic" : ""}`}>
         {verdict.fate}
       </motion.p>
@@ -131,6 +145,21 @@ export function VerdictEntry({ verdict, sealsBroken, onReset }: Props) {
           {CODEX.again}
         </button>
       </motion.div>
+
+      <motion.p {...ink(2.4)} className="mt-4 mb-0 text-[16px] italic text-ink-muted">
+        {isMine ? (
+          <>
+            {JUDGMENT.remembered}{" "}
+            <button type="button" onClick={onForget} className="codex-link codex-focus cursor-pointer border-0 bg-transparent p-0 italic">
+              {JUDGMENT.forgetMe}
+            </button>
+          </>
+        ) : (
+          <button type="button" onClick={onRemember} className="codex-link codex-focus cursor-pointer border-0 bg-transparent p-0 italic">
+            {JUDGMENT.rememberMine}
+          </button>
+        )}
+      </motion.p>
 
       {verdict.demo && <p className="mt-4 mb-0 text-[15px] italic text-ink-muted">{SITE.demoNotice}</p>}
     </motion.article>

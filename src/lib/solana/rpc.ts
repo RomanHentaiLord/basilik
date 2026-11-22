@@ -30,23 +30,44 @@ export async function rpc<T>(method: string, params: unknown[]): Promise<T> {
   return result;
 }
 
-/** Send several calls in one HTTP request. Results come back in the same order. */
+const RETRIES = 4;
+
+function backoff(attempt: number): Promise<void> {
+  // 1s, 2s, 4s, 8s, each ±25%: what Helius recommends after a 429.
+  const base = 1000 * 2 ** attempt;
+  const ms = base * (0.75 + Math.random() * 0.5);
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Send several calls in one HTTP request. Results come back in the same order.
+ * Rate limits (429) and server errors are retried with backoff; anything else fails at once.
+ */
 export async function rpcBatch<T>(
   calls: { method: string; params: unknown[] }[],
 ): Promise<T[]> {
   if (calls.length === 0) return [];
-  const body = calls.map((call, id) => ({ jsonrpc: "2.0", id, ...call }));
-  const response = await fetch(rpcUrl(), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    throw new RpcError(`RPC HTTP ${response.status}`, response.status);
+  const body = JSON.stringify(calls.map((call, id) => ({ jsonrpc: "2.0", id, ...call })));
+
+  let response: Response | null = null;
+  for (let attempt = 0; attempt <= RETRIES; attempt++) {
+    response = await fetch(rpcUrl(), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body,
+      cache: "no-store",
+    });
+    const retryable = response.status === 429 || response.status >= 500;
+    if (!retryable || attempt === RETRIES) break;
+    await backoff(attempt);
   }
-  const payload = (await response.json()) as RpcResponse<T>[];
-  const byId = new Map(payload.map((item) => [item.id, item]));
+  if (!response || !response.ok) {
+    throw new RpcError(`RPC HTTP ${response?.status ?? "no response"}`, response?.status);
+  }
+
+  const payload = (await response.json()) as RpcResponse<T>[] | RpcResponse<T>;
+  const list = Array.isArray(payload) ? payload : [payload];
+  const byId = new Map(list.map((item) => [item.id, item]));
   return calls.map((call, id) => {
     const item = byId.get(id);
     if (!item) throw new RpcError(`No RPC response for ${call.method}`);

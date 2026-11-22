@@ -1,4 +1,4 @@
-import { DAY_MS } from "./config";
+import { DAY_MS, RANKS, RANK_FLOORS, type Rank } from "./config";
 import { fnv1a } from "./flavor";
 import type { WalletEvent, WalletHistory } from "./types";
 
@@ -8,26 +8,32 @@ import type { WalletEvent, WalletHistory } from "./types";
  * so the site can be designed and tested end to end.
  */
 
-type Scenario =
-  | "witness"
-  | "sympathizer"
-  | "pet"
-  | "keeper"
-  | "priest"
-  | "apostle"
-  | "doubter"
-  | "traitor"
-  | "forgiven";
+type Scenario = "witness" | "sympathizer" | "doubter" | "traitor" | "forgiven" | Rank;
 
+/** More small holders than whales, like a real coin. */
 const SCENARIOS: Scenario[] = [
   "witness",
   "sympathizer",
+  "sympathizer",
   "pet",
   "pet",
+  "pet",
+  "acolyte",
+  "acolyte",
+  "scribe",
+  "scribe",
+  "lamplighter",
+  "lamplighter",
   "keeper",
+  "warden",
+  "herald",
   "priest",
+  "archon",
   "apostle",
+  "hand",
   "doubter",
+  "doubter",
+  "traitor",
   "traitor",
   "traitor",
   "forgiven",
@@ -35,6 +41,10 @@ const SCENARIOS: Scenario[] = [
 
 export function demoScenario(address: string): Scenario {
   return SCENARIOS[fnv1a(`scenario:${address}`) % SCENARIOS.length];
+}
+
+function isRank(scenario: Scenario): scenario is Rank {
+  return (RANKS as readonly string[]).includes(scenario);
 }
 
 export function demoHistory(address: string, now: number): WalletHistory {
@@ -49,6 +59,8 @@ export function demoHistory(address: string, now: number): WalletHistory {
   const vary = (base: number, spread: number) =>
     Math.round((base * (1 - spread / 2 + ((h % 1000) / 1000) * spread)) / 1000) * 1000;
   const shift = h % 5;
+  // Some holders have held long enough for tenure to lift them.
+  const heldDays = 6 + ((h >>> 10) % 70);
 
   const push = (kind: WalletEvent["kind"], amount: number, at: number) => {
     balance += kind === "buy" || kind === "in" ? amount : -amount;
@@ -61,23 +73,17 @@ export function demoHistory(address: string, now: number): WalletHistory {
     });
   };
 
+  if (isRank(scenario)) {
+    // 1.5x the floor, ±25%: always inside the rank's band on the 1-2-5 ladder.
+    push("buy", vary(RANK_FLOORS[scenario] * 1.5, 0.5), day(heldDays));
+    return { address, balance, events };
+  }
+
   switch (scenario) {
     case "witness":
       break;
     case "sympathizer":
-      push("buy", vary(42_000, 0.8), day(12 + shift));
-      break;
-    case "pet":
-      push("buy", vary(350_000, 0.8), day(9 + shift));
-      break;
-    case "keeper":
-      push("buy", vary(2_400_000, 0.6), day(20 + shift));
-      break;
-    case "priest":
-      push("buy", vary(6_200_000, 0.3), day(15 + shift));
-      break;
-    case "apostle":
-      push("buy", vary(14_000_000, 0.4), day(40 + shift));
+      push("buy", vary(9_000, 0.8), day(12 + shift));
       break;
     case "doubter": {
       const bought = vary(900_000, 0.8);
@@ -86,10 +92,10 @@ export function demoHistory(address: string, now: number): WalletHistory {
       break;
     }
     case "traitor": {
-      // Sells everything but a little dust: always below the threshold.
+      // Sells everything but a little dust: always more than half of the peak.
       const bought = vary(1_500_000, 1.2);
       push("buy", bought, day(30 + shift));
-      push("sell", bought - (h % 90_000), day(3 + (h % 9)));
+      push("sell", bought - (h % 15_000), day(3 + (h % 9)));
       break;
     }
     case "forgiven": {

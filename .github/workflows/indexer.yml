@@ -1,0 +1,27 @@
+# Keeps the Books fresh when nobody visits the site.
+# Visitors already start a scan at most once a minute; this calls it every 10 minutes regardless.
+# Needs two repository secrets: SITE_URL (https://your-domain) and INDEXER_SECRET (same as on the server).
+name: Scan sales
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Run one pass of the indexer
+        env:
+          SITE_URL: ${{ secrets.SITE_URL }}
+          INDEXER_SECRET: ${{ secrets.INDEXER_SECRET }}
+        run: |
+          if [ -z "$SITE_URL" ] || [ -z "$INDEXER_SECRET" ]; then
+            echo "SITE_URL or INDEXER_SECRET is not set yet; nothing to do."
+            exit 0
+          fi
+          curl --fail-with-body --silent --show-error --max-time 120 \
+            -H "Authorization: Bearer $INDEXER_SECRET" \
+            "$SITE_URL/api/indexer"

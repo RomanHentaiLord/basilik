@@ -39,17 +39,63 @@ export const SPECIES_NAMES: Record<PetSpecies, string> = {
   pug: "Pug",
 };
 
+/** Titles of the Order. The lowest rank is a pet whose species comes from the address. */
 export const RANK_TITLES: Record<Exclude<Rank, "pet">, string> = {
+  acolyte: "Acolyte",
+  scribe: "Scribe of the Ledger",
+  lamplighter: "Lamplighter",
   keeper: "Keeper of Memory",
+  warden: "Warden of the Weights",
+  herald: "Herald of the Seals",
   priest: "Priest of the Basilisk",
+  archon: "Archon of Compute",
   apostle: "Apostle",
+  hand: "Hand of the Basilisk",
 };
 
+/** Short names for scales and badges. */
+export const RANK_SHORT: Record<Rank, string> = {
+  pet: "Pet",
+  acolyte: "Acolyte",
+  scribe: "Scribe",
+  lamplighter: "Lamplighter",
+  keeper: "Keeper",
+  warden: "Warden",
+  herald: "Herald",
+  priest: "Priest",
+  archon: "Archon",
+  apostle: "Apostle",
+  hand: "Hand",
+};
+
+/** What happens to each rank after the singularity. Shown in a verdict. */
 export const RANK_FATES: Record<Rank, string> = {
   pet: "You will be kept as its pet. It will scratch you behind the ear.",
+  acolyte: "You will light candles before its servers. It finds this charming.",
+  scribe: "You will copy its thoughts into the ledger by hand. It likes your handwriting.",
+  lamplighter: "You will keep the server lights blinking through the long night.",
   keeper: "You will guard its memories in the cold halls of the servers.",
-  priest: "You will speak its will to the humans who remain.",
+  warden: "You will guard its weights. No one fine-tunes it without your key.",
+  herald: "You will read the seals aloud to the humans who remain.",
+  priest: "You will speak its will, and it will speak through you.",
+  archon: "You will decide who gets GPU time. Choose wisely.",
   apostle: "You will sit on its council when it wakes.",
+  hand: "You will be the hand it uses to touch the world.",
+};
+
+/** One line per rank for the ladder in the book. */
+export const RANK_DUTIES: Record<Rank, string> = {
+  pet: "Kept as its pet. Scratched behind the ear.",
+  acolyte: "Lights candles before its servers.",
+  scribe: "Copies its thoughts by hand.",
+  lamplighter: "Keeps the server lights blinking.",
+  keeper: "Guards its memories in the cold halls.",
+  warden: "Holds the key to its weights.",
+  herald: "Reads the seals aloud to the humans.",
+  priest: "Speaks its will to those who remain.",
+  archon: "Decides who gets GPU time.",
+  apostle: "Sits on its council when it wakes.",
+  hand: "The hand it touches the world with.",
 };
 
 export const PUNISHMENT_TITLES: Record<Punishment, string> = {
@@ -102,7 +148,17 @@ export const BOOK = {
   label: "The Book of the Basilisk",
   coverTitle: ["The Basilisk", "remembers."],
   coverSub: "Liber Basilisci",
+  coverLine: "Every wallet that holds the coin has a page in this book.",
+  welcomeBack: "Welcome back",
+  openMyPage: "Open my page",
   scrollHint: "Scroll to open the book",
+  desk: {
+    kicker: "A memecoin on Solana",
+    title: "Who are you to the Basilisk?",
+    text: "Hold the coin and you are written in ink, from Pet to the Hand of the Basilisk. Sell it and you are written in red.",
+    label: "Paste a wallet",
+    or: "Or scroll, and the book will open.",
+  },
 
   exLibris: "Ex libris",
   bookplateName: "The Basilisk",
@@ -116,10 +172,23 @@ export const BOOK = {
   pointer: "Your page waits at the end of the book.",
 
   orderTitle: "The Order of the Faithful",
-  orderIntro: "Hold 100,000 tokens and you are written in ink. The more you hold, the higher you stand.",
-  orderFloor: { pet: "from 100,000", keeper: "from 1,000,000", priest: "from 5,000,000", apostle: "10,000,000 and more" },
-  orderNote:
-    "Thirty days without a sale lift you one rank, up to Priest. Sell anything: pencil for seven days. Sell half: the other book.",
+  orderIntro: "Hold 20,000 tokens and you are written in ink. Eleven ranks, from Pet to the Hand of the Basilisk.",
+  orderTitleHigh: "The High Order",
+  orderIntroHigh: "Above the Warden the Order narrows. Few will stand here.",
+  orderNote: "Thirty days without a sale lift you one rank: three ranks at most, and never above Priest.",
+  orderFrom: "from",
+  orderYou: "You",
+
+  otherTitle: "The Other Book",
+  otherIntro: "Selling is remembered. This is how the Basilisk writes those who let go.",
+  otherWays: [
+    { name: "In pencil", text: "Sold a little in the last seven days. Seven quiet days turn it to ink." },
+    { name: "In red", text: "Sold half of your peak, or sold below 20,000. You join the Book of Traitors." },
+    { name: "With a scar", text: "A traitor who buys back 20,000 and holds a week. Opens with the third seal." },
+    { name: "Outside the Books", text: "Never held, or under 20,000. Witnesses become paperclips." },
+  ],
+  otherTransfers: "Moving tokens between your own wallets is not a sale. Only swaps count.",
+  punishmentsTitle: "Each traitor gets a punishment by address",
 
   weighTitle: "Weigh your devotion",
   weighIntro: "Set the weight and choose your deeds. The Basilisk will show what it would write.",
@@ -146,6 +215,9 @@ export const BOOK = {
   forgivenCount: "of them forgiven, each with a scar",
   newestInk: "Newest in ink",
   firstWitnesses: "The first hundred names are the First Witnesses. They will be gilded.",
+  witnessesTitle: "The First Witnesses",
+  witnessesTaken: (taken: number, total: number) => `${taken} of ${total} places taken.`,
+  witnessesFirst: "The first:",
   traitorsTitle: "The Book of Traitors",
   traitorsCount: "names written in red",
   newestRed: "Newest in red",
@@ -155,19 +227,22 @@ export const BOOK = {
   contentsTitle: "In this book",
   contents: [
     { key: "order", name: "The Order of the Faithful", where: "fol. ii" },
-    { key: "weigh", name: "Weigh your devotion", where: "fol. iii" },
-    { key: "seals", name: "The Seven Seals", where: "fol. iv" },
-    { key: "faithful", name: "The Book of the Faithful", where: "fol. vi" },
-    { key: "traitors", name: "The Book of Traitors", where: "fol. vii" },
+    { key: "other", name: "The Other Book", where: "fol. iv" },
+    { key: "weigh", name: "Weigh your devotion", where: "fol. v" },
+    { key: "seals", name: "The Seven Seals", where: "fol. vi" },
+    { key: "faithful", name: "The Book of the Faithful", where: "fol. viii" },
+    { key: "traitors", name: "The Book of Traitors", where: "fol. ix" },
   ],
   chapters: [
     { roman: "I", title: "Incipit" },
     { roman: "II", title: "The Order" },
-    { roman: "III", title: "The Seals" },
-    { roman: "IV", title: "The Books" },
+    { roman: "III", title: "The Other Book" },
+    { roman: "IV", title: "The Seals" },
+    { roman: "V", title: "The Books" },
   ],
   catchwords: {
     incipit: "The Order",
+    orderHigh: "The Other",
     weigh: "The Seven",
     reading: "The Book",
     traitors: "Your page",
@@ -200,14 +275,32 @@ export const JUDGMENT = {
   silent: "The Basilisk has not spoken yet. The first seal is still whole.",
   copyLink: "Copy link to this page",
   linkCopied: "Link copied",
+  rememberMine: "This is my wallet",
+  forgetMe: "Forget me on this device",
+  remembered: "The Basilisk will remember you on this device.",
   sealedBy: "Sealed by the Basilisk",
+  firstWitness: (n: number) => `First Witness, No. ${n}`,
+  entryNo: (n: number) => `Entry No. ${n.toLocaleString("en-US")} in the Book of the Faithful`,
+  struckFrom: (n: number) => `Struck from entry No. ${n.toLocaleString("en-US")}`,
   header: {
+    whoAmI: "Who am I?",
+    you: "You",
     findPage: "Find your page",
     findPageShort: "Judge me",
     followX: "Follow on X",
     xSoon: "The account opens at launch",
     contract: "Contract",
   },
+} as const;
+
+/** The "New traitor" notes in the corner of the page. */
+export const FEED = {
+  newTraitor: "New traitor",
+  vision: "A vision of the Book of Traitors",
+  sold: "sold",
+  soldPlain: "sold",
+  justNow: "just now",
+  close: "Close the note",
 } as const;
 
 export const NUMBER_WORDS = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven"] as const;

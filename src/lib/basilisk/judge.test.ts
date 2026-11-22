@@ -29,13 +29,13 @@ describe("chain of checks", () => {
   });
 
   it("2 — below the threshold and never faithful: sympathizer", () => {
-    const v = run(history([["buy", 42_000, 5]]));
+    const v = run(history([["buy", 12_000, 5]]));
     expect(v.status).toBe("sympathizer");
     expect(v.book).toBeNull();
   });
 
   it("2 — a small holder who sold is still only a sympathizer", () => {
-    const v = run(history([["buy", 80_000, 9], ["sell", 70_000, 1]]));
+    const v = run(history([["buy", 15_000, 9], ["sell", 10_000, 1]]));
     expect(v.status).toBe("sympathizer");
   });
 
@@ -111,7 +111,7 @@ describe("chain of checks", () => {
   });
 
   it("transfers are never betrayal", () => {
-    const v = run(history([["buy", 1_000_000, 30], ["out", 950_000, 5]]));
+    const v = run(history([["buy", 1_000_000, 30], ["out", 990_000, 5]]));
     expect(v.status).toBe("sympathizer");
     expect(v.traitorAt).toBeNull();
   });
@@ -128,16 +128,23 @@ describe("chain of checks", () => {
     expect(v.status).toBe("faithful");
   });
 
-  it("6 — rank by balance", () => {
-    expect(run(history([["buy", 350_000, 3]])).rank).toBe("pet");
-    expect(run(history([["buy", 2_400_000, 3]])).rank).toBe("keeper");
+  it("6 — rank by balance, eleven steps from 20,000", () => {
+    expect(run(history([["buy", 20_000, 3]])).rank).toBe("pet");
+    expect(run(history([["buy", 60_000, 3]])).rank).toBe("acolyte");
+    expect(run(history([["buy", 150_000, 3]])).rank).toBe("scribe");
+    expect(run(history([["buy", 350_000, 3]])).rank).toBe("lamplighter");
+    expect(run(history([["buy", 700_000, 3]])).rank).toBe("keeper");
+    expect(run(history([["buy", 1_200_000, 3]])).rank).toBe("warden");
+    expect(run(history([["buy", 2_400_000, 3]])).rank).toBe("herald");
     expect(run(history([["buy", 6_200_000, 3]])).rank).toBe("priest");
-    expect(run(history([["buy", 14_000_000, 3]])).rank).toBe("apostle");
+    expect(run(history([["buy", 14_000_000, 3]])).rank).toBe("archon");
+    expect(run(history([["buy", 25_000_000, 3]])).rank).toBe("apostle");
+    expect(run(history([["buy", 60_000_000, 3]])).rank).toBe("hand");
   });
 
   it("6 — pets get a species from the address, always the same one", () => {
-    const a = run(history([["buy", 350_000, 3]]));
-    const b = run(history([["buy", 350_000, 3]]));
+    const a = run(history([["buy", 30_000, 3]]));
+    const b = run(history([["buy", 30_000, 3]]));
     expect(a.title).toMatch(/ of the Basilisk$/);
     expect(a.title).toBe(b.title);
   });
@@ -145,26 +152,34 @@ describe("chain of checks", () => {
 
 describe("tenure", () => {
   it("lifts one step per 30 days without selling", () => {
-    expect(run(history([["buy", 350_000, 31]])).rank).toBe("keeper");
-    expect(run(history([["buy", 350_000, 61]])).rank).toBe("priest");
+    expect(run(history([["buy", 30_000, 31]])).rank).toBe("acolyte");
+    expect(run(history([["buy", 30_000, 61]])).rank).toBe("scribe");
+    expect(run(history([["buy", 30_000, 91]])).rank).toBe("lamplighter");
+  });
+
+  it("lifts three ranks at most", () => {
+    expect(run(history([["buy", 30_000, 400]])).rank).toBe("lamplighter");
+    expect(applyTenure("pet", 1000)).toBe("lamplighter");
   });
 
   it("never lifts above priest", () => {
-    expect(run(history([["buy", 350_000, 400]])).rank).toBe("priest");
-    expect(applyTenure("pet", 1000)).toBe("priest");
+    expect(run(history([["buy", 2_400_000, 400]])).rank).toBe("priest");
+    expect(applyTenure("herald", 1000)).toBe("priest");
   });
 
-  it("apostle comes from balance only", () => {
-    expect(applyTenure("apostle", 0)).toBe("apostle");
+  it("the ranks above priest come from balance only", () => {
+    expect(applyTenure("archon", 1000)).toBe("archon");
     expect(rankByBalance(9_999_999)).toBe("priest");
-    expect(rankByBalance(10_000_000)).toBe("apostle");
+    expect(rankByBalance(10_000_000)).toBe("archon");
+    expect(rankByBalance(50_000_000)).toBe("hand");
+    expect(rankByBalance(19_999)).toBeNull();
   });
 
   it("a sale restarts the tenure clock", () => {
     const v = run(history([["buy", 900_000, 90], ["sell", 100_000, 10]]));
     expect(v.status).toBe("faithful");
     expect(v.tenureDays).toBe(10);
-    expect(v.rank).toBe("pet");
+    expect(v.rank).toBe("keeper");
   });
 });
 

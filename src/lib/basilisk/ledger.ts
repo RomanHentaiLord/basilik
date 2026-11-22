@@ -13,6 +13,8 @@ import type { WalletEvent } from "./types";
 export interface Ledger {
   everHeld: boolean;
   everFaithful: boolean;
+  /** The first time the wallet reached the threshold. Orders the Book of the Faithful. */
+  firstFaithfulAt: number | null;
   /** Highest balance since the last betrayal (or since first becoming faithful). */
   peak: number;
   /** Start of the current uninterrupted stretch at or above the threshold. */
@@ -48,6 +50,7 @@ export function replay(events: readonly WalletEvent[]): Ledger {
   const ledger: Ledger = {
     everHeld: false,
     everFaithful: false,
+    firstFaithfulAt: null,
     peak: 0,
     aboveSince: null,
     lastSellAt: null,
@@ -71,6 +74,7 @@ export function replay(events: readonly WalletEvent[]): Ledger {
     // Uninterrupted stretch at or above the threshold.
     if (balance >= FAITHFUL_THRESHOLD) {
       if (ledger.aboveSince === null) ledger.aboveSince = event.at;
+      if (ledger.firstFaithfulAt === null) ledger.firstFaithfulAt = event.at;
       ledger.everFaithful = true;
     } else {
       ledger.aboveSince = null;

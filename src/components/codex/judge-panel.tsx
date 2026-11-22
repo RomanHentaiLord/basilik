@@ -6,7 +6,8 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { CODEX, SITE } from "@/lib/basilisk/copy";
 import { isSolanaAddress } from "@/lib/solana/address";
 import { useTRPC } from "@/lib/trpc/client";
-import { JUDGE_EVENT } from "./judge-link";
+import { currentIdentity, forgetIdentity, saveIdentity, useIdentity } from "./identity";
+import { JUDGE_EVENT, type JudgeRequest } from "./judge-link";
 import { VerdictEntry } from "./verdict-entry";
 
 /** Keeps the judged wallet in the address bar, so the page can be shared and reopened. */
@@ -22,16 +23,19 @@ function writeWalletToUrl(address: string | null) {
 export function JudgePanel({ sealsBroken }: { sealsBroken: number }) {
   const trpc = useTRPC();
   const reduce = useReducedMotion();
+  const me = useIdentity();
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState("");
   const [address, setAddress] = useState<string | null>(null);
+  // True when the visitor typed this wallet as their own (not a name touched in the Books).
+  const [mine, setMine] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const verdict = useQuery(
     trpc.basilisk.judge.queryOptions({ address: address ?? "" }, { enabled: address !== null }),
   );
 
-  const judge = useCallback((raw: string) => {
+  const judge = useCallback((raw: string, typedByVisitor: boolean) => {
     const trimmed = raw.trim();
     setValue(trimmed);
     if (!isSolanaAddress(trimmed)) {
@@ -39,19 +43,33 @@ export function JudgePanel({ sealsBroken }: { sealsBroken: number }) {
       setAddress(null);
       return false;
     }
+    const known = currentIdentity();
+    // A typed wallet becomes "me" when nobody is remembered yet, or when it is the remembered one.
+    setMine(typedByVisitor && (!known || known.address === trimmed));
     setLocalError(null);
     setAddress(trimmed);
     writeWalletToUrl(trimmed);
     return true;
   }, []);
 
-  // A name touched in the Books, or a shared link that carries ?wallet=.
+  // Remember the visitor once their own verdict arrives; keep the remembered title fresh.
+  const data = verdict.data;
   useEffect(() => {
-    const onJudge = (event: Event) => judge((event as CustomEvent<string>).detail);
+    if (!data) return;
+    const known = currentIdentity();
+    if (mine || known?.address === data.address) saveIdentity(data);
+  }, [data, mine]);
+
+  // A name touched in the Books, the quick form by the cover, or a shared link with ?wallet=.
+  useEffect(() => {
+    const onJudge = (event: Event) => {
+      const request = (event as CustomEvent<JudgeRequest>).detail;
+      judge(request.address, request.mine);
+    };
     window.addEventListener(JUDGE_EVENT, onJudge);
     const timer = window.setTimeout(() => {
       const shared = new URLSearchParams(window.location.search).get("wallet");
-      if (shared && judge(shared)) document.getElementById("judgment")?.scrollIntoView({ block: "start" });
+      if (shared && judge(shared, false)) document.getElementById("judgment")?.scrollIntoView({ block: "start" });
     }, 0);
     return () => {
       window.removeEventListener(JUDGE_EVENT, onJudge);
@@ -59,9 +77,28 @@ export function JudgePanel({ sealsBroken }: { sealsBroken: number }) {
     };
   }, [judge]);
 
+  // A returning visitor: open their page as soon as it comes into view.
+  const rememberedAddress = me?.address ?? null;
+  useEffect(() => {
+    if (!rememberedAddress || address) return;
+    const section = document.getElementById("judgment");
+    if (!section) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          observer.disconnect();
+          judge(rememberedAddress, true);
+        }
+      },
+      { rootMargin: "0px 0px 30% 0px" },
+    );
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, [rememberedAddress, address, judge]);
+
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    judge(value);
+    judge(value, true);
   }
 
   function reset() {
@@ -126,7 +163,15 @@ export function JudgePanel({ sealsBroken }: { sealsBroken: number }) {
 
       <AnimatePresence mode="wait">
         {address && verdict.data && !verdict.isFetching && (
-          <VerdictEntry key={verdict.data.address} verdict={verdict.data} sealsBroken={sealsBroken} onReset={reset} />
+          <VerdictEntry
+            key={verdict.data.address}
+            verdict={verdict.data}
+            sealsBroken={sealsBroken}
+            isMine={me?.address === verdict.data.address}
+            onRemember={() => verdict.data && saveIdentity(verdict.data)}
+            onForget={forgetIdentity}
+            onReset={reset}
+          />
         )}
       </AnimatePresence>
     </div>

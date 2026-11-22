@@ -35,7 +35,7 @@ function fallbackSeal(overview: SealsOverview): number {
 export function SealsPage({ overview }: { overview: SealsOverview }) {
   const next = overview.next;
   return (
-    <Page folio="iv">
+    <Page folio="vi">
       <h2 className="page-title">{CODEX.sealsTitle}</h2>
       <p className="page-text">{BOOK.sealsIntro}</p>
       <SealsGrid seals={views(overview)} fallback={fallbackSeal(overview)} />
@@ -62,7 +62,7 @@ export function SealsPage({ overview }: { overview: SealsOverview }) {
 /** Right page: the seal you touched, read aloud. */
 export function ReadingPage({ overview }: { overview: SealsOverview }) {
   return (
-    <Page folio="v" catchword={BOOK.catchwords.reading}>
+    <Page folio="vii" catchword={BOOK.catchwords.reading}>
       <SealReading seals={views(overview)} fallback={fallbackSeal(overview)} mcapUsd={overview.mcapUsd} />
     </Page>
   );

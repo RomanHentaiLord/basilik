@@ -65,6 +65,12 @@ export interface Verdict {
   scar: boolean;
   /** Days left until forgiveness, when a traitor is repenting. */
   redemptionDaysLeft: number | null;
+  /** When the wallet first reached the threshold (ms), or null if it never did. */
+  firstFaithfulAt: number | null;
+  /** Place in the Book of the Faithful by the time of entry; filled in by the server. */
+  entryNumber: number | null;
+  /** Among the first hundred to enter the Book. */
+  firstWitness: boolean;
   /** True when the verdict was produced from simulated data (no token yet). */
   demo: boolean;
 }
