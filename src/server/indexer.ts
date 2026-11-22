@@ -56,15 +56,13 @@ export async function runIndexerOnce({ force = false }: { force?: boolean } = {}
   if (!(await tryLock(db, "lock", LOCK_TTL_MS))) return { ran: false, reason: "busy" };
 
   try {
-    // Seals never close: keep the highest market cap ever seen, and graduation once it happened.
+    // Seals never close: keep the highest confirmed market cap, and graduation once it happened.
     const market = await getMarketState(mint);
     const memory = mergeMarketMemory(await readState<MarketMemory>(db, MARKET_ATH_KEY), market);
-    if (memory.changed) await writeState(db, MARKET_ATH_KEY, { usd: memory.usd, graduated: memory.graduated });
-    const sealsBroken = countBrokenSeals({
-      mcapUsd: market.mcapUsd,
-      graduated: Boolean(memory.graduated),
-      athMcapUsd: memory.usd,
-    });
+    if (memory.changed) {
+      await writeState(db, MARKET_ATH_KEY, { usd: memory.usd, graduated: memory.graduated, lastUsd: memory.lastUsd });
+    }
+    const sealsBroken = countBrokenSeals({ mcapUsd: market.mcapUsd, graduated: memory.graduated, athMcapUsd: memory.usd });
 
     const exclude = [process.env.ALTAR_WALLET?.trim()].filter((address): address is string => Boolean(address));
     const result = await runIndexer({ db, mint, source: rpcSource(mint), now, sealsBroken, budget: BUDGET, exclude });
@@ -80,7 +78,7 @@ export async function runIndexerOnce({ force = false }: { force?: boolean } = {}
       mcapUsd: market.mcapUsd,
       marketSource: market.source,
       athMcapUsd: memory.usd,
-      graduated: Boolean(memory.graduated),
+      graduated: memory.graduated,
       sealsBroken,
       ...result,
     };

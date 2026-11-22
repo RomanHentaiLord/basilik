@@ -29,16 +29,15 @@ export async function marketState(): Promise<MarketState & { demo: boolean; sour
   const mint = tokenMint();
   if (!mint) return { ...DEMO_MARKET, demo: true, source: "demo" };
   const market = await getMarketState(mint);
-  let memory: MarketMemory | null = null;
-  if (db) {
-    try {
-      memory = await readState<MarketMemory>(db, MARKET_ATH_KEY);
-    } catch (error) {
-      console.error("[market] could not read the market memory", error);
-    }
+  if (!db) return { ...market, athMcapUsd: market.mcapUsd, demo: false };
+  try {
+    // The indexer saves each reading; a high breaks seals once two readings in a row reach it.
+    const merged = mergeMarketMemory(await readState<MarketMemory>(db, MARKET_ATH_KEY), market);
+    return { ...market, graduated: merged.graduated, athMcapUsd: merged.usd, demo: false };
+  } catch (error) {
+    console.error("[market] could not read the market memory", error);
+    return { ...market, athMcapUsd: market.mcapUsd, demo: false };
   }
-  const merged = mergeMarketMemory(memory, market);
-  return { ...market, graduated: Boolean(merged.graduated), athMcapUsd: merged.usd, demo: false };
 }
 
 /** Seals, market cap and progress. Cached for a minute: the page stays static between refreshes. */

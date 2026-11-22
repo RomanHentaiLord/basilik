@@ -16,20 +16,31 @@ export type AnyDb = PgDatabase<PgQueryResultHKT, typeof schema>;
 /** indexer_state key holding what the market has reached so far (seals never close). */
 export const MARKET_ATH_KEY = "market-ath";
 
-/** Highest market cap ever seen, and whether the coin has left the bonding curve. */
+/** Highest confirmed market cap, whether the coin has left the bonding curve, and the last reading. */
 export interface MarketMemory {
   usd: number;
   graduated?: boolean;
+  /** The previous reading. A new high only counts once the next reading reaches it too. */
+  lastUsd?: number;
 }
 
-/** The stored memory plus a new reading. `changed` says whether it needs saving. */
+/**
+ * The stored memory plus a new reading. A high counts once two readings in a row reach it,
+ * so one bad answer from a price source can never break a seal (seals never close again).
+ * Graduation comes from the bonding curve itself and counts at once.
+ * `changed` says whether the memory needs saving.
+ */
 export function mergeMarketMemory(
   memory: MarketMemory | null,
   reading: { mcapUsd: number; graduated: boolean },
-): MarketMemory & { changed: boolean } {
-  const usd = Math.max(memory?.usd ?? 0, reading.mcapUsd);
+): Required<MarketMemory> & { changed: boolean } {
+  const confirmed = Math.min(memory?.lastUsd ?? 0, reading.mcapUsd);
+  const usd = Math.max(memory?.usd ?? 0, confirmed);
   const graduated = Boolean(memory?.graduated) || reading.graduated;
-  return { usd, graduated, changed: usd !== (memory?.usd ?? 0) || graduated !== Boolean(memory?.graduated) };
+  const lastUsd = reading.mcapUsd;
+  const changed =
+    usd !== (memory?.usd ?? 0) || graduated !== Boolean(memory?.graduated) || lastUsd !== memory?.lastUsd;
+  return { usd, graduated, lastUsd, changed };
 }
 
 export interface TraitorRow {

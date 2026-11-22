@@ -181,15 +181,24 @@ describe("getMarketState", () => {
 });
 
 describe("market memory", () => {
-  it("keeps the highest market cap and remembers graduation", () => {
+  it("counts a high once two readings in a row reach it", () => {
     const first = mergeMarketMemory(null, { mcapUsd: 30_000, graduated: false });
-    expect(first).toEqual({ usd: 30_000, graduated: false, changed: true });
+    expect(first).toEqual({ usd: 0, graduated: false, lastUsd: 30_000, changed: true });
 
-    const graduated = mergeMarketMemory(first, { mcapUsd: 90_000, graduated: true });
-    expect(graduated).toEqual({ usd: 90_000, graduated: true, changed: true });
+    const second = mergeMarketMemory(first, { mcapUsd: 32_000, graduated: false });
+    expect(second).toMatchObject({ usd: 30_000, lastUsd: 32_000 });
+  });
 
-    // A price site down and the chain unreachable: nothing is forgotten, nothing to save.
-    const quiet = mergeMarketMemory(graduated, { mcapUsd: 0, graduated: false });
-    expect(quiet).toEqual({ usd: 90_000, graduated: true, changed: false });
+  it("ignores a single wild reading", () => {
+    // The old DexScreener code once read a junk pair as a $14B market cap.
+    let memory = mergeMarketMemory({ usd: 1_400_000, lastUsd: 1_500_000 }, { mcapUsd: 14_008_714_280, graduated: true });
+    expect(memory.usd).toBe(1_500_000);
+    memory = mergeMarketMemory(memory, { mcapUsd: 1_495_998, graduated: true });
+    expect(memory.usd).toBe(1_500_000);
+  });
+
+  it("remembers graduation and the high when sources go quiet", () => {
+    const memory = mergeMarketMemory({ usd: 90_000, graduated: true, lastUsd: 95_000 }, { mcapUsd: 0, graduated: false });
+    expect(memory).toEqual({ usd: 90_000, graduated: true, lastUsd: 0, changed: true });
   });
 });
