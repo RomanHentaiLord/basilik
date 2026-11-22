@@ -8,6 +8,13 @@
       "when": 1795285261919,
       "tag": "0000_eminent_roulette",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795383294947,
+      "tag": "0001_stage2_books",
+      "breakpoints": true
     }
   ]
 }

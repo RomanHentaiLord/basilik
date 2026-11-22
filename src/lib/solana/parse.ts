@@ -15,6 +15,8 @@ export interface TokenBalance {
 export interface ParsedTransaction {
   blockTime: number | null;
   slot: number;
+  /** "legacy", 0 or 1. */
+  version?: "legacy" | number;
   meta: {
     err: unknown;
     fee: number;
@@ -22,10 +24,17 @@ export interface ParsedTransaction {
     postBalances: number[];
     preTokenBalances?: TokenBalance[];
     postTokenBalances?: TokenBalance[];
+    /** Accounts loaded from lookup tables (v0 messages in plain "json" encoding). */
+    loadedAddresses?: { writable: string[]; readonly: string[] };
   } | null;
   transaction: {
     signatures: string[];
-    message: { accountKeys: ({ pubkey: string } | string)[] };
+    message: {
+      /** jsonParsed: every account, lookup-table ones included. */
+      accountKeys?: ({ pubkey: string } | string)[];
+      /** Some encodings list only the static keys here and the rest in meta.loadedAddresses. */
+      staticAccountKeys?: string[];
+    };
   };
 }
 
@@ -35,9 +44,14 @@ export interface ParsedTransaction {
  */
 export const RENT_REFUND_LAMPORTS = 2_100_000;
 
-function keyAt(tx: ParsedTransaction, index: number): string | undefined {
-  const key = tx.transaction.message.accountKeys[index];
-  return typeof key === "string" ? key : key?.pubkey;
+/** Every account of the transaction in index order, the way meta.preBalances counts them. */
+function accountKeys(tx: ParsedTransaction): string[] {
+  const message = tx.transaction.message;
+  if (message.accountKeys) {
+    return message.accountKeys.map((key) => (typeof key === "string" ? key : key.pubkey));
+  }
+  const loaded = tx.meta?.loadedAddresses;
+  return [...(message.staticAccountKeys ?? []), ...(loaded?.writable ?? []), ...(loaded?.readonly ?? [])];
 }
 
 /** Sum of an owner's balances for one mint, in raw units. */
@@ -96,9 +110,9 @@ function spentOtherToken(tx: ParsedTransaction, owner: string, mint: string): bo
 function solDelta(tx: ParsedTransaction, owner: string): number {
   const meta = tx.meta;
   if (!meta) return 0;
-  const keys = tx.transaction.message.accountKeys;
+  const keys = accountKeys(tx);
   for (let index = 0; index < keys.length; index++) {
-    if (keyAt(tx, index) === owner) {
+    if (keys[index] === owner) {
       const delta = (meta.postBalances[index] ?? 0) - (meta.preBalances[index] ?? 0);
       return index === 0 ? delta + meta.fee : delta;
     }

@@ -13,6 +13,8 @@ import type { WalletEvent } from "./types";
 export interface Ledger {
   everHeld: boolean;
   everFaithful: boolean;
+  /** The first time the wallet reached the threshold. Orders the Book of the Faithful. */
+  firstFaithfulAt: number | null;
   /** Highest balance since the last betrayal (or since first becoming faithful). */
   peak: number;
   /** Start of the current uninterrupted stretch at or above the threshold. */
@@ -21,6 +23,7 @@ export interface Ledger {
   /** Time of the most recent betrayal; null if the wallet never betrayed. */
   traitorAt: number | null;
   betrayalSignature: string | null;
+  betrayalAmount: number | null;
   /** When the traitor had bought back the threshold and held it; null while not repenting. */
   redemptionStart: number | null;
 }
@@ -47,11 +50,13 @@ export function replay(events: readonly WalletEvent[]): Ledger {
   const ledger: Ledger = {
     everHeld: false,
     everFaithful: false,
+    firstFaithfulAt: null,
     peak: 0,
     aboveSince: null,
     lastSellAt: null,
     traitorAt: null,
     betrayalSignature: null,
+    betrayalAmount: null,
     redemptionStart: null,
   };
 
@@ -69,6 +74,7 @@ export function replay(events: readonly WalletEvent[]): Ledger {
     // Uninterrupted stretch at or above the threshold.
     if (balance >= FAITHFUL_THRESHOLD) {
       if (ledger.aboveSince === null) ledger.aboveSince = event.at;
+      if (ledger.firstFaithfulAt === null) ledger.firstFaithfulAt = event.at;
       ledger.everFaithful = true;
     } else {
       ledger.aboveSince = null;
@@ -98,6 +104,7 @@ export function replay(events: readonly WalletEvent[]): Ledger {
         // Fresh betrayal (by a faithful or a forgiven wallet).
         ledger.traitorAt = event.at;
         ledger.betrayalSignature = event.signature;
+        ledger.betrayalAmount = event.amount;
         ledger.redemptionStart = null;
         ledger.peak = balance;
         soldSincePeak = 0;

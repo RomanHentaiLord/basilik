@@ -6,6 +6,7 @@ import {
   RANK_FLOORS,
   REDEMPTION_DAYS,
   REPENTANCE_SEAL,
+  TENURE_MAX_STEPS,
   TENURE_RANK_CAP,
   TENURE_STEP_DAYS,
   type Rank,
@@ -40,13 +41,16 @@ export function rankByBalance(balance: number): Rank | null {
   return result;
 }
 
-/** Each full tenure step lifts the rank by one, capped at Priest. Apostle comes from balance only. */
+/**
+ * Each full tenure step lifts the rank by one: at most TENURE_MAX_STEPS steps, never above
+ * the tenure cap. Ranks above the cap are earned by balance only, and tenure never lowers a rank.
+ */
 export function applyTenure(base: Rank, tenureDays: number): Rank {
-  if (base === "apostle") return base;
-  const steps = Math.floor(tenureDays / TENURE_STEP_DAYS);
+  const baseIndex = RANKS.indexOf(base);
   const capIndex = RANKS.indexOf(TENURE_RANK_CAP);
-  const index = Math.min(RANKS.indexOf(base) + steps, capIndex);
-  return RANKS[Math.max(index, RANKS.indexOf(base))];
+  if (baseIndex >= capIndex) return base;
+  const steps = Math.min(Math.floor(tenureDays / TENURE_STEP_DAYS), TENURE_MAX_STEPS);
+  return RANKS[Math.min(baseIndex + steps, capIndex)];
 }
 
 function faithfulTitle(rank: Rank, address: string): string {
@@ -87,8 +91,12 @@ export function judge(history: WalletHistory, options: JudgeOptions): Verdict {
     lastSellAt: ledger.lastSellAt,
     traitorAt: ledger.traitorAt,
     betrayalSignature: ledger.betrayalSignature,
+    betrayalAmount: ledger.betrayalAmount,
     scar: false,
     redemptionDaysLeft: null,
+    firstFaithfulAt: ledger.firstFaithfulAt,
+    entryNumber: null,
+    firstWitness: false,
     demo: options.demo ?? false,
   };
 

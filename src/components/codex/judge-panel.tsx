@@ -1,0 +1,179 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { CODEX, SITE } from "@/lib/basilisk/copy";
+import { isSolanaAddress } from "@/lib/solana/address";
+import { useTRPC } from "@/lib/trpc/client";
+import { currentIdentity, forgetIdentity, saveIdentity, useIdentity } from "./identity";
+import { JUDGE_EVENT, type JudgeRequest } from "./judge-link";
+import { VerdictEntry } from "./verdict-entry";
+
+/** Keeps the judged wallet in the address bar, so the page can be shared and reopened. */
+function writeWalletToUrl(address: string | null) {
+  const url = new URL(window.location.href);
+  if (address) url.searchParams.set("wallet", address);
+  else url.searchParams.delete("wallet");
+  url.hash = "";
+  window.history.replaceState(window.history.state, "", url);
+}
+
+/** The wallet form on "Your page" and the entry the Basilisk writes under it. */
+export function JudgePanel({ sealsBroken }: { sealsBroken: number }) {
+  const trpc = useTRPC();
+  const reduce = useReducedMotion();
+  const me = useIdentity();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [value, setValue] = useState("");
+  const [address, setAddress] = useState<string | null>(null);
+  // True when the visitor typed this wallet as their own (not a name touched in the Books).
+  const [mine, setMine] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const verdict = useQuery(
+    trpc.basilisk.judge.queryOptions({ address: address ?? "" }, { enabled: address !== null }),
+  );
+
+  const judge = useCallback((raw: string, typedByVisitor: boolean) => {
+    const trimmed = raw.trim();
+    setValue(trimmed);
+    if (!isSolanaAddress(trimmed)) {
+      setLocalError(SITE.invalid);
+      setAddress(null);
+      return false;
+    }
+    const known = currentIdentity();
+    // A typed wallet becomes "me" when nobody is remembered yet, or when it is the remembered one.
+    setMine(typedByVisitor && (!known || known.address === trimmed));
+    setLocalError(null);
+    setAddress(trimmed);
+    writeWalletToUrl(trimmed);
+    return true;
+  }, []);
+
+  // Remember the visitor once their own verdict arrives; keep the remembered title fresh.
+  const data = verdict.data;
+  useEffect(() => {
+    if (!data) return;
+    const known = currentIdentity();
+    if (mine || known?.address === data.address) saveIdentity(data);
+  }, [data, mine]);
+
+  // A name touched in the Books, the quick form by the cover, or a shared link with ?wallet=.
+  useEffect(() => {
+    const onJudge = (event: Event) => {
+      const request = (event as CustomEvent<JudgeRequest>).detail;
+      judge(request.address, request.mine);
+    };
+    window.addEventListener(JUDGE_EVENT, onJudge);
+    const timer = window.setTimeout(() => {
+      const shared = new URLSearchParams(window.location.search).get("wallet");
+      if (shared && judge(shared, false)) document.getElementById("judgment")?.scrollIntoView({ block: "start" });
+    }, 0);
+    return () => {
+      window.removeEventListener(JUDGE_EVENT, onJudge);
+      window.clearTimeout(timer);
+    };
+  }, [judge]);
+
+  // A returning visitor: open their page as soon as it comes into view.
+  const rememberedAddress = me?.address ?? null;
+  useEffect(() => {
+    if (!rememberedAddress || address) return;
+    const section = document.getElementById("judgment");
+    if (!section) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          observer.disconnect();
+          judge(rememberedAddress, true);
+        }
+      },
+      { rootMargin: "0px 0px 30% 0px" },
+    );
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, [rememberedAddress, address, judge]);
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    judge(value, true);
+  }
+
+  function reset() {
+    setAddress(null);
+    setValue("");
+    writeWalletToUrl(null);
+    inputRef.current?.focus();
+  }
+
+  const error = localError ?? verdict.error?.message ?? null;
+  const reading = verdict.isFetching && !verdict.data;
+
+  return (
+    <div>
+      <form onSubmit={onSubmit} noValidate>
+        <label htmlFor="wallet" className="mb-1.5 block text-[17px] italic text-ink-muted">
+          {CODEX.walletLabel}
+        </label>
+        <div className="flex flex-wrap items-end gap-3.5">
+          <input
+            ref={inputRef}
+            id="wallet"
+            name="wallet"
+            className="codex-input"
+            placeholder={SITE.placeholder}
+            autoComplete="off"
+            spellCheck={false}
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "wallet-error" : undefined}
+          />
+          <button type="submit" className="codex-button" disabled={verdict.isFetching}>
+            {SITE.cta}
+          </button>
+        </div>
+      </form>
+
+      {error && (
+        <p id="wallet-error" role="alert" className="mt-3 mb-0 text-[18px] italic text-rubric">
+          {error}
+        </p>
+      )}
+
+      {reading && (
+        <p className="mt-6 mb-0 text-[19px] italic text-ink-muted" aria-live="polite">
+          {CODEX.reading}
+          <span aria-hidden="true">
+            {[0, 1, 2].map((dot) => (
+              <motion.span
+                key={dot}
+                initial={reduce ? false : { opacity: 0.25 }}
+                animate={reduce ? undefined : { opacity: [0.25, 1, 0.25] }}
+                transition={{ duration: 1.2, repeat: Infinity, delay: dot * 0.2 }}
+              >
+                .
+              </motion.span>
+            ))}
+          </span>
+        </p>
+      )}
+
+      <AnimatePresence mode="wait">
+        {address && verdict.data && !verdict.isFetching && (
+          <VerdictEntry
+            key={verdict.data.address}
+            verdict={verdict.data}
+            sealsBroken={sealsBroken}
+            isMine={me?.address === verdict.data.address}
+            onRemember={() => verdict.data && saveIdentity(verdict.data)}
+            onForget={forgetIdentity}
+            onReset={reset}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

@@ -37,6 +37,30 @@ function tx(partial: {
 }
 
 describe("parseTransaction", () => {
+  it("finds the wallet among lookup-table accounts when only static keys are listed", () => {
+    const event = parseTransaction(
+      {
+        blockTime: 1_790_000_000,
+        slot: 1,
+        version: 0,
+        meta: {
+          err: null,
+          fee: 5_000,
+          preBalances: [5_000_000_000, 0, 10_000_000_000],
+          postBalances: [5_000_000_000, 0, 9_500_000_000],
+          preTokenBalances: [],
+          postTokenBalances: [balance(3, OWNER, MINT, "250000000000")],
+          loadedAddresses: { writable: [OWNER], readonly: [] },
+        },
+        transaction: { signatures: ["sig"], message: { staticAccountKeys: [OTHER, "pool"] } },
+      },
+      OWNER,
+      MINT,
+    );
+    // Without the loaded addresses the SOL payment is invisible and this would read as a transfer in.
+    expect(event).toMatchObject({ kind: "buy", amount: 250_000 });
+  });
+
   it("buy: tokens in, SOL out", () => {
     const event = parseTransaction(
       tx({

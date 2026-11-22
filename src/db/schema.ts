@@ -3,11 +3,13 @@ import {
   doublePrecision,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   serial,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -21,19 +23,32 @@ export const wallets = pgTable(
   {
     address: text("address").primaryKey(),
     status: text("status").notNull(), // witness | sympathizer | faithful | doubter | traitor | forgiven
-    rank: text("rank"), // pet | keeper | priest | apostle
+    rank: text("rank"), // pet … hand, see RANKS
+    title: text("title").notNull().default(""),
     flavor: text("flavor").notNull(),
     balance: doublePrecision("balance").notNull().default(0),
     peak: doublePrecision("peak").notNull().default(0),
+    /** Start of the current stretch at or above the threshold. */
     faithfulSince: timestamp("faithful_since", { withTimezone: true }),
+    /** The first time the wallet ever reached the threshold: orders the Book and the First Witnesses. */
+    firstFaithfulAt: timestamp("first_faithful_at", { withTimezone: true }),
     lastSellAt: timestamp("last_sell_at", { withTimezone: true }),
     traitorAt: timestamp("traitor_at", { withTimezone: true }),
     betrayalSignature: text("betrayal_signature"),
+    betrayalAmount: doublePrecision("betrayal_amount"),
+    scar: boolean("scar").notNull().default(false),
     firstWitness: boolean("first_witness").notNull().default(false),
+    /** "judge" when a visitor checked the wallet (full history), "indexer" when seen in the sales scan. */
+    source: text("source").notNull().default("indexer"),
     firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
     lastJudgedAt: timestamp("last_judged_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("wallets_status_idx").on(table.status)],
+  (table) => [
+    index("wallets_status_idx").on(table.status),
+    index("wallets_first_faithful_idx").on(table.firstFaithfulAt),
+    index("wallets_traitor_at_idx").on(table.traitorAt),
+  ],
 );
 
 /** Classified balance changes — feeds the live ticker ("New traitor: 4fQa…a1 sold 2.3M"). */
@@ -51,8 +66,16 @@ export const events = pgTable(
   (table) => [
     index("events_address_idx").on(table.address),
     index("events_at_idx").on(table.at),
+    uniqueIndex("events_signature_address_idx").on(table.signature, table.address),
   ],
 );
+
+/** Small pieces of indexer state: the scan cursor, the market's all-time high, a run lock. */
+export const indexerState = pgTable("indexer_state", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 /** Broken seals and their two-part prophecies. */
 export const seals = pgTable("seals", {
