@@ -15,6 +15,8 @@ import { rpc } from "./rpc";
  * 4. GeckoTerminal.
  *
  * The first source in that order that gives a market cap wins; each gets a few seconds.
+ * The last two are only asked when the first two have no price: a DAS call costs 10 Helius
+ * credits (a plain RPC call costs 1), and the free plan has 1M a month.
  * For local testing, MARKET_MCAP_USD / MARKET_GRADUATED override everything.
  */
 
@@ -92,21 +94,35 @@ async function dasPrice(mint: string): Promise<{ price: number; supply: number }
   return { price, supply: (info.supply ?? 0) / 10 ** (info.decimals ?? 0) };
 }
 
+/** Helius refreshes DAS prices every 10 minutes; asking more often than this buys nothing. */
+const SOL_PRICE_TTL_MS = 5 * 60_000;
+let solPrice: { usd: number; at: number } | null = null;
+
+/** SOL in USD, from Helius DAS, remembered for a few minutes. */
+async function solUsd(): Promise<number | null> {
+  if (solPrice && Date.now() - solPrice.at < SOL_PRICE_TTL_MS) return solPrice.usd;
+  const quote = await dasPrice(WSOL).catch(() => null);
+  if (quote) solPrice = { usd: quote.price, at: Date.now() };
+  return quote?.price ?? solPrice?.usd ?? null;
+}
+
+/** For tests. */
+export function forgetSolPrice() {
+  solPrice = null;
+}
+
 export const chain: Provider = async (mint) => {
-  const curveAddress = await bondingCurveAddress(mint);
-  const [account, sol] = await Promise.all([
-    rpc<{ value: { data: [string, string] } | null }>("getAccountInfo", [
-      curveAddress,
-      { encoding: "base64", commitment: "confirmed" },
-    ]),
-    dasPrice(WSOL).catch(() => null),
+  const account = await rpc<{ value: { data: [string, string] } | null }>("getAccountInfo", [
+    await bondingCurveAddress(mint),
+    { encoding: "base64", commitment: "confirmed" },
   ]);
   if (!account?.value) return null; // Not a pump.fun coin.
   const curve = decodeBondingCurve(Buffer.from(account.value.data[0], "base64"));
   if (!curve) return null;
   // After graduation the curve is frozen; the price lives in the new pool.
   if (curve.complete) return { graduated: true };
-  return sol ? { mcapUsd: curveMarketCapSol(curve) * sol.price, graduated: false } : { graduated: false };
+  const sol = await solUsd();
+  return sol ? { mcapUsd: curveMarketCapSol(curve) * sol, graduated: false } : { graduated: false };
 };
 
 // ── Price sites ────────────────────────────────────────────────────────────
@@ -161,12 +177,19 @@ export const geckoTerminal: Provider = async (mint) => {
 
 // ── Putting it together ────────────────────────────────────────────────────
 
-/** In order of trust. */
-export const PROVIDERS: [ProviderName, Provider][] = [
-  ["chain", chain],
-  ["dexscreener", dexScreener],
-  ["helius", heliusDas],
-  ["geckoterminal", geckoTerminal],
+/**
+ * In order of trust. Each group is asked at once; the next group only when the one before
+ * gave no price.
+ */
+export const PROVIDERS: [ProviderName, Provider][][] = [
+  [
+    ["chain", chain],
+    ["dexscreener", dexScreener],
+  ],
+  [
+    ["helius", heliusDas],
+    ["geckoterminal", geckoTerminal],
+  ],
 ];
 
 type Outcome = { quote: Quote | null; error?: string };
@@ -196,7 +219,7 @@ function plausible(usd: number | undefined): usd is number {
 
 export async function getMarketState(
   mint: string,
-  providers: [ProviderName, Provider][] = PROVIDERS,
+  groups: [ProviderName, Provider][][] = PROVIDERS,
   timeoutMs = TIMEOUT_MS,
 ): Promise<MarketReading> {
   const override = process.env.MARKET_MCAP_USD;
@@ -204,19 +227,21 @@ export async function getMarketState(
     return { mcapUsd: Number(override), graduated: process.env.MARKET_GRADUATED === "true", source: "override" };
   }
 
-  // Everyone is asked at once; answers are read in order of trust, so a fast trusted
-  // answer does not wait for a slow site.
-  const pending = providers.map(([, provider]) => ask(provider, mint, timeoutMs));
   const failures: string[] = [];
   let graduated: boolean | undefined;
 
-  for (let index = 0; index < providers.length; index++) {
-    const [name] = providers[index];
-    const { quote, error } = await pending[index];
-    if (error) failures.push(`${name}: ${error}`);
-    if (name === "chain" && quote?.graduated !== undefined) graduated = quote.graduated;
-    if (plausible(quote?.mcapUsd)) {
-      return { mcapUsd: quote.mcapUsd, graduated: graduated ?? false, source: name };
+  for (const group of groups) {
+    // The group is asked at once; answers are read in order of trust, so a fast trusted
+    // answer does not wait for a slow site.
+    const pending = group.map(([, provider]) => ask(provider, mint, timeoutMs));
+    for (let index = 0; index < group.length; index++) {
+      const [name] = group[index];
+      const { quote, error } = await pending[index];
+      if (error) failures.push(`${name}: ${error}`);
+      if (name === "chain" && quote?.graduated !== undefined) graduated = quote.graduated;
+      if (plausible(quote?.mcapUsd)) {
+        return { mcapUsd: quote.mcapUsd, graduated: graduated ?? false, source: name };
+      }
     }
   }
 

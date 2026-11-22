@@ -6,6 +6,7 @@ import {
   curveMarketCapSol,
   decodeBondingCurve,
   dexScreener,
+  forgetSolPrice,
   getMarketState,
   marketCapFromPairs,
   type Provider,
@@ -70,6 +71,7 @@ describe("bonding curve", () => {
 
   it("reads the curve over RPC and prices it with the SOL price", async () => {
     vi.stubEnv("SOLANA_RPC_URL", "https://rpc.test");
+    forgetSolPrice();
     const curveAddress = await bondingCurveAddress(MINT);
     const seen: string[] = [];
     vi.stubGlobal(
@@ -93,9 +95,33 @@ describe("bonding curve", () => {
       }),
     );
     const quote = await chain(MINT);
-    expect(seen.sort()).toEqual(["getAccountInfo", "getAsset"]);
+    expect(seen).toEqual(["getAccountInfo", "getAsset"]);
     expect(quote?.graduated).toBe(false);
     expect(quote?.mcapUsd).toBeCloseTo(27.96 * 200, 0);
+
+    // The SOL price is remembered: the next reading costs one plain RPC call.
+    await chain(MINT);
+    expect(seen).toEqual(["getAccountInfo", "getAsset", "getAccountInfo"]);
+  });
+
+  it("does not ask for the SOL price once the coin has graduated", async () => {
+    vi.stubEnv("SOLANA_RPC_URL", "https://rpc.test");
+    forgetSolPrice();
+    const seen: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: { body: string }) => {
+        const calls = JSON.parse(init.body) as { id: number; method: string }[];
+        const data = Buffer.from(curveBytes({ ...FRESH, complete: true })).toString("base64");
+        const payload = calls.map((call) => {
+          seen.push(call.method);
+          return { jsonrpc: "2.0", id: call.id, result: { value: { data: [data, "base64"] } } };
+        });
+        return { ok: true, status: 200, json: async () => payload };
+      }),
+    );
+    expect(await chain(MINT)).toEqual({ graduated: true });
+    expect(seen).toEqual(["getAccountInfo"]);
   });
 });
 
@@ -122,11 +148,15 @@ describe("DexScreener", () => {
 });
 
 describe("getMarketState", () => {
-  const order = (chainP: Provider, dex: Provider, helius: Provider, gecko: Provider): [ProviderName, Provider][] => [
-    ["chain", chainP],
-    ["dexscreener", dex],
-    ["helius", helius],
-    ["geckoterminal", gecko],
+  const order = (chainP: Provider, dex: Provider, helius: Provider, gecko: Provider): [ProviderName, Provider][][] => [
+    [
+      ["chain", chainP],
+      ["dexscreener", dex],
+    ],
+    [
+      ["helius", helius],
+      ["geckoterminal", gecko],
+    ],
   ];
 
   it("answers from the chain without waiting for a slow price site", async () => {
@@ -136,6 +166,15 @@ describe("getMarketState", () => {
       60_000,
     );
     expect(reading).toEqual({ mcapUsd: 5_000, graduated: false, source: "chain" });
+  });
+
+  it("does not spend Helius credits when the chain or DexScreener has the price", async () => {
+    const helius = vi.fn(answers({ mcapUsd: 1 }));
+    const gecko = vi.fn(answers({ mcapUsd: 1 }));
+    const reading = await getMarketState(MINT, order(answers({ graduated: true }), answers({ mcapUsd: 1_495_998 }), helius, gecko), 50);
+    expect(reading).toEqual({ mcapUsd: 1_495_998, graduated: true, source: "dexscreener" });
+    expect(helius).not.toHaveBeenCalled();
+    expect(gecko).not.toHaveBeenCalled();
   });
 
   it("after graduation takes the price from the next source that knows it", async () => {
