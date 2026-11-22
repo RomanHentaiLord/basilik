@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { mergeMarketMemory } from "@/db/books";
+import { mergeMarketMemory, savedReading } from "@/db/books";
 import {
   bondingCurveAddress,
   chain,
@@ -209,6 +209,7 @@ describe("getMarketState", () => {
     const reading = await getMarketState(MINT, order(fails, never, fails, never), 50);
     expect(reading).toEqual({ mcapUsd: 0, graduated: false, source: "none" });
     expect(log.mock.calls[0][0]).toContain("chain: fetch failed");
+    expect(log.mock.calls[0][0]).toMatch(/dexscreener: no answer in 0\.\ds/);
   });
 
   it("uses the local override when it is set", async () => {
@@ -220,30 +221,39 @@ describe("getMarketState", () => {
 });
 
 describe("market memory", () => {
-  it("counts a high once two readings in a row reach it", () => {
-    const first = mergeMarketMemory(null, { mcapUsd: 30_000, graduated: false });
-    expect(first).toEqual({ usd: 0, graduated: false, lastUsd: 30_000, changed: true });
+  it("counts a high once two good readings in a row reach it", () => {
+    const first = mergeMarketMemory(null, { mcapUsd: 30_000, graduated: false, source: "chain" }, 1_000);
+    expect(first).toEqual({ usd: 0, graduated: false, lastUsd: 30_000, lastSource: "chain", lastAt: 1_000, changed: true });
 
-    const second = mergeMarketMemory(first, { mcapUsd: 32_000, graduated: false });
-    expect(second).toMatchObject({ usd: 30_000, lastUsd: 32_000 });
+    const second = mergeMarketMemory(first, { mcapUsd: 32_000, graduated: false, source: "chain" }, 2_000);
+    expect(second).toMatchObject({ usd: 30_000, lastUsd: 32_000, lastAt: 2_000 });
   });
 
   it("ignores a single wild reading", () => {
     // The old DexScreener code once read a junk pair as a $14B market cap.
-    let memory = mergeMarketMemory({ usd: 1_400_000, lastUsd: 1_500_000 }, { mcapUsd: 14_008_714_280, graduated: true });
+    let memory = mergeMarketMemory({ usd: 1_400_000, lastUsd: 1_500_000 }, { mcapUsd: 14_008_714_280, graduated: true, source: "dexscreener" });
     expect(memory.usd).toBe(1_500_000);
-    memory = mergeMarketMemory(memory, { mcapUsd: 1_495_998, graduated: true });
+    memory = mergeMarketMemory(memory, { mcapUsd: 1_495_998, graduated: true, source: "dexscreener" });
     expect(memory.usd).toBe(1_500_000);
   });
 
   it("starts over from memory saved before readings were confirmed", () => {
     // What the first live run stored on a test coin: a junk $14B high, never confirmed.
-    const memory = mergeMarketMemory({ usd: 14_008_714_280, graduated: true }, { mcapUsd: 1_495_998, graduated: true });
-    expect(memory).toEqual({ usd: 0, graduated: true, lastUsd: 1_495_998, changed: true });
+    const memory = mergeMarketMemory({ usd: 14_008_714_280, graduated: true }, { mcapUsd: 1_495_998, graduated: true, source: "dexscreener" }, 5);
+    expect(memory).toEqual({ usd: 0, graduated: true, lastUsd: 1_495_998, lastSource: "dexscreener", lastAt: 5, changed: true });
   });
 
-  it("remembers graduation and the high when sources go quiet", () => {
-    const memory = mergeMarketMemory({ usd: 90_000, graduated: true, lastUsd: 95_000 }, { mcapUsd: 0, graduated: false });
-    expect(memory).toEqual({ usd: 90_000, graduated: true, lastUsd: 0, changed: true });
+  it("keeps the high, graduation and the last good reading when every source fails", () => {
+    const before = { usd: 90_000, graduated: true, lastUsd: 95_000, lastSource: "chain", lastAt: 5 };
+    const memory = mergeMarketMemory(before, { mcapUsd: 0, graduated: false, source: "none" }, 9);
+    expect(memory).toEqual({ ...before, changed: false });
+  });
+
+  it("offers the last good reading only while it is fresh", () => {
+    const memory = { usd: 90_000, lastUsd: 95_000, lastSource: "chain", lastAt: 1_000 };
+    expect(savedReading(memory, 1_000 + 60_000, 5 * 60_000)).toEqual({ mcapUsd: 95_000, source: "chain", at: 1_000 });
+    expect(savedReading(memory, 1_000 + 6 * 60_000, 5 * 60_000)).toBeNull();
+    expect(savedReading({ usd: 0, lastUsd: 0, lastSource: "none", lastAt: 1_000 }, 1_000, 5 * 60_000)).toBeNull();
+    expect(savedReading(null, 1_000, 5 * 60_000)).toBeNull();
   });
 });

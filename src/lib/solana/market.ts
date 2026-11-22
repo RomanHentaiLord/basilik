@@ -1,6 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import type { MarketState } from "@/lib/basilisk/seals";
-import { rpc } from "./rpc";
+import { rpc, type RpcOptions } from "./rpc";
 
 /**
  * Market cap and graduation status for the seals. Several sources are asked at once, because
@@ -36,6 +36,8 @@ export interface Quote {
 export type Provider = (mint: string) => Promise<Quote | null>;
 
 const TIMEOUT_MS = 4_000;
+/** A rate-limited RPC call gets one quick retry here; waiting longer would only hit the timeout. */
+const QUICK: RpcOptions = { retries: 1 };
 /** No memecoin is worth this much; a bigger number is a broken source. */
 const MAX_PLAUSIBLE_USD = 1e12;
 const PUMP_PROGRAM = new PublicKey("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P");
@@ -87,7 +89,7 @@ interface DasAsset {
 
 /** USD price and supply from Helius DAS (any other RPC answers with an error). */
 async function dasPrice(mint: string): Promise<{ price: number; supply: number } | null> {
-  const asset = await rpc<DasAsset | null>("getAsset", { id: mint, options: { showFungible: true } });
+  const asset = await rpc<DasAsset | null>("getAsset", { id: mint, options: { showFungible: true } }, QUICK);
   const info = asset?.token_info;
   const price = info?.price_info?.price_per_token;
   if (!info || !price) return null;
@@ -112,10 +114,11 @@ export function forgetSolPrice() {
 }
 
 export const chain: Provider = async (mint) => {
-  const account = await rpc<{ value: { data: [string, string] } | null }>("getAccountInfo", [
-    await bondingCurveAddress(mint),
-    { encoding: "base64", commitment: "confirmed" },
-  ]);
+  const account = await rpc<{ value: { data: [string, string] } | null }>(
+    "getAccountInfo",
+    [await bondingCurveAddress(mint), { encoding: "base64", commitment: "confirmed" }],
+    QUICK,
+  );
   if (!account?.value) return null; // Not a pump.fun coin.
   const curve = decodeBondingCurve(Buffer.from(account.value.data[0], "base64"));
   if (!curve) return null;
@@ -194,11 +197,22 @@ export const PROVIDERS: [ProviderName, Provider][][] = [
 
 type Outcome = { quote: Quote | null; error?: string };
 
-/** Never throws and never takes longer than `ms`. */
+/** Never throws, and gives up after about `ms`. */
 async function ask(provider: Provider, mint: string, ms: number): Promise<Outcome> {
+  const started = Date.now();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<Outcome>((resolve) => {
-    timer = setTimeout(() => resolve({ quote: null, error: `no answer in ${ms / 1000}s` }), ms);
+    const expire = (grace: boolean) => {
+      const waited = Date.now() - started;
+      // A timer that fires late means this process was frozen (compiling, a slow disk):
+      // the answer may already be waiting unread, so give it a moment before giving up.
+      if (grace && waited > ms + 250) {
+        timer = setTimeout(() => expire(false), 500);
+        return;
+      }
+      resolve({ quote: null, error: `no answer in ${(waited / 1000).toFixed(1)}s` });
+    };
+    timer = setTimeout(() => expire(true), ms);
   });
   const answer = Promise.resolve()
     .then(() => provider(mint))

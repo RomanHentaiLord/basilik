@@ -60,7 +60,7 @@ describe("getTransactions", () => {
 
   it("splits into batches and keeps the order", async () => {
     const requests = fakeRpc((call) => tx(call.params[0]));
-    const out = await getTransactions<{ transaction: { signatures: string[] } }>(["a", "b", "c", "d", "e"], 2);
+    const out = await getTransactions<{ transaction: { signatures: string[] } }>(["a", "b", "c", "d", "e"], { size: 2 });
     expect(requests.map((calls) => calls.length)).toEqual([2, 2, 1]);
     expect(out.map((item) => item?.transaction.signatures[0])).toEqual(["a", "b", "c", "d", "e"]);
   });

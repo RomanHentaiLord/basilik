@@ -42,8 +42,13 @@ function rpcUrl(): string {
   return url;
 }
 
-export async function rpc<T>(method: string, params: unknown): Promise<T> {
-  const [result] = await rpcBatch<T>([{ method, params }]);
+export interface RpcOptions {
+  /** Retries after a rate limit or a server error. Interactive callers with a fallback use fewer. */
+  retries?: number;
+}
+
+export async function rpc<T>(method: string, params: unknown, options: RpcOptions = {}): Promise<T> {
+  const [result] = await rpcBatch<T>([{ method, params }], options);
   return result;
 }
 
@@ -57,11 +62,14 @@ function backoff(attempt: number): Promise<void> {
 }
 
 /** One HTTP request with every call in it; retries rate limits and server errors with backoff. */
-async function post<T>(calls: { method: string; params: unknown }[]): Promise<Map<number, RpcResponse<T>>> {
+async function post<T>(
+  calls: { method: string; params: unknown }[],
+  retries = RETRIES,
+): Promise<Map<number, RpcResponse<T>>> {
   const body = JSON.stringify(calls.map((call, id) => ({ jsonrpc: "2.0", id, ...call })));
 
   let response: Response | null = null;
-  for (let attempt = 0; attempt <= RETRIES; attempt++) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       response = await fetch(rpcUrl(), {
         method: "POST",
@@ -71,12 +79,15 @@ async function post<T>(calls: { method: string; params: unknown }[]): Promise<Ma
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch (error) {
-      if (attempt === RETRIES) throw new RpcError(`RPC unreachable: ${error instanceof Error ? error.message : error}`);
+      if (attempt === retries) throw new RpcError(`RPC unreachable: ${error instanceof Error ? error.message : error}`);
       await backoff(attempt);
       continue;
     }
     const retryable = response.status === 429 || response.status >= 500;
-    if (!retryable || attempt === RETRIES) break;
+    if (!retryable || attempt === retries) break;
+    if (response.status === 429 && attempt === 0) {
+      console.warn(`[rpc] the RPC is rate limiting us (429) on ${calls[0]?.method}; waiting and retrying`);
+    }
     await backoff(attempt);
   }
   if (!response || !response.ok) {
@@ -96,9 +107,9 @@ async function post<T>(calls: { method: string; params: unknown }[]): Promise<Ma
  * Send several calls in one HTTP request. Results come back in the same order.
  * Any error in any call fails the whole batch.
  */
-export async function rpcBatch<T>(calls: { method: string; params: unknown }[]): Promise<T[]> {
+export async function rpcBatch<T>(calls: { method: string; params: unknown }[], options: RpcOptions = {}): Promise<T[]> {
   if (calls.length === 0) return [];
-  const byId = await post<T>(calls);
+  const byId = await post<T>(calls, options.retries);
   return calls.map((call, id) => {
     const item = byId.get(id);
     if (!item) throw new RpcError(`No RPC response for ${call.method}`);
@@ -130,9 +141,15 @@ const ITEM_RETRIES = 2;
  * An unsupported-version error is thrown at once: it means the request itself is wrong, and
  * skipping would lose every such sale.
  */
-export async function getTransactions<T>(signatures: string[], size = 20): Promise<(T | null)[]> {
+export async function getTransactions<T>(
+  signatures: string[],
+  { size = 10, gapMs = 0 }: { size?: number; gapMs?: number } = {},
+): Promise<(T | null)[]> {
   const found = new Map<string, T | null>();
   for (let i = 0; i < signatures.length; i += size) {
+    // Each transaction in a batch counts against the RPC's requests per second (10 on the
+    // Helius free plan): background callers leave a gap so pages and wallet checks still get through.
+    if (i > 0 && gapMs > 0) await new Promise((resolve) => setTimeout(resolve, gapMs));
     let pending = signatures.slice(i, i + size);
     for (let attempt = 0; pending.length > 0; attempt++) {
       const results = await rpcBatchSettled<T | null>(
