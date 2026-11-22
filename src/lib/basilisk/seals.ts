@@ -32,12 +32,15 @@ export const SEALS: readonly Seal[] = [
 export interface MarketState {
   mcapUsd: number;
   graduated: boolean;
-  /** Highest market cap ever seen — seals never close again. */
+  /**
+   * Highest confirmed market cap — seals never close again. When it is known, only it breaks
+   * seals: a single reading (which may come from a broken source) does not.
+   */
   athMcapUsd?: number;
 }
 
 function triggerMet(trigger: SealTrigger, state: MarketState): boolean {
-  const best = Math.max(state.mcapUsd, state.athMcapUsd ?? 0);
+  const best = state.athMcapUsd ?? state.mcapUsd;
   if (trigger.kind === "graduation") return state.graduated;
   return best >= trigger.usd;
 }

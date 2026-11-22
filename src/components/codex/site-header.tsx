@@ -1,8 +1,9 @@
 import { JUDGMENT } from "@/lib/basilisk/copy";
 import { Emblem } from "./ornaments";
 import { Ribbon } from "./ribbon";
+import { WhoAmI } from "./you";
 
-/** The bar over the desk: the name, the X account, a shortcut to your page, and the contract ribbon. */
+/** The bar over the desk: the name, the X account, "Who am I?" (or your rank), and the contract ribbon. */
 export function SiteHeader({ mint }: { mint: string | null }) {
   const x = process.env.NEXT_PUBLIC_X_URL?.trim() || null;
   const words = JUDGMENT.header;
@@ -23,10 +24,7 @@ export function SiteHeader({ mint }: { mint: string | null }) {
             <span className="long">Follow on&nbsp;</span>X
           </span>
         )}
-        <a className="header-cta codex-focus" href="#judgment">
-          <span className="long">{words.findPage}</span>
-          <span className="short">{words.findPageShort}</span>
-        </a>
+        <WhoAmI />
         <Ribbon mint={mint} />
       </nav>
     </header>

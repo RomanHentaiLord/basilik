@@ -1,40 +1,43 @@
 import "server-only";
-import { cacheLife } from "next/cache";
+import { cacheLife, revalidateTag } from "next/cache";
+import {
+  entryOf,
+  MARKET_ATH_KEY,
+  mergeMarketMemory,
+  readState,
+  saveEventRows,
+  saveVerdicts,
+  type MarketMemory,
+} from "@/db/books";
+import { db } from "@/db";
+import { FIRST_WITNESS_COUNT } from "@/lib/basilisk/config";
 import { demoHistory } from "@/lib/basilisk/demo";
+import { fnv1a } from "@/lib/basilisk/flavor";
 import { judge } from "@/lib/basilisk/judge";
 import { countBrokenSeals, nextSeal, SEALS, type MarketState } from "@/lib/basilisk/seals";
 import type { Verdict } from "@/lib/basilisk/types";
 import { getWalletHistory } from "@/lib/solana/history";
-import { DEMO_MARKET, getMarketState } from "@/lib/solana/market";
+import { DEMO_MARKET, getMarketState, type MarketSource } from "@/lib/solana/market";
+import { tokenMint } from "./env";
 
-/** The coin's mint address. Empty until launch → the whole site runs in demo mode. */
-export function tokenMint(): string | null {
-  return process.env.TOKEN_MINT?.trim() || null;
-}
+export { tokenMint };
 
-export async function marketState(): Promise<MarketState & { demo: boolean }> {
+/** How many imaginary wallets have entered the Book in demo mode, for entry numbers. */
+const DEMO_ENTERED = 1200;
+
+export async function marketState(): Promise<MarketState & { demo: boolean; source: MarketSource }> {
   const mint = tokenMint();
-  if (!mint) return { ...DEMO_MARKET, demo: true };
-  return { ...(await getMarketState(mint)), demo: false };
-}
-
-export async function judgeWallet(address: string): Promise<Verdict> {
-  const now = Date.now();
-  const mint = tokenMint();
-
-  if (!mint) {
-    return judge(demoHistory(address, now), {
-      now,
-      sealsBroken: countBrokenSeals(DEMO_MARKET),
-      demo: true,
-    });
+  if (!mint) return { ...DEMO_MARKET, demo: true, source: "demo" };
+  const market = await getMarketState(mint);
+  if (!db) return { ...market, athMcapUsd: market.mcapUsd, demo: false };
+  try {
+    // The indexer saves each reading; a high breaks seals once two readings in a row reach it.
+    const merged = mergeMarketMemory(await readState<MarketMemory>(db, MARKET_ATH_KEY), market);
+    return { ...market, graduated: merged.graduated, athMcapUsd: merged.usd, demo: false };
+  } catch (error) {
+    console.error("[market] could not read the market memory", error);
+    return { ...market, athMcapUsd: market.mcapUsd, demo: false };
   }
-
-  const [history, market] = await Promise.all([
-    getWalletHistory(address, mint),
-    getMarketState(mint),
-  ]);
-  return judge(history, { now, sealsBroken: countBrokenSeals(market) });
 }
 
 /** Seals, market cap and progress. Cached for a minute: the page stays static between refreshes. */
@@ -47,8 +50,55 @@ export async function sealsOverview() {
   return {
     demo: market.demo,
     mcapUsd: market.mcapUsd,
+    /** Where the market cap came from; "none" when every source failed. */
+    source: market.source,
     broken,
     next: nextSeal(market),
     seals: SEALS.map((seal) => ({ ...seal, broken: seal.number <= broken })),
   };
+}
+
+/** Demo entries get a stable imaginary place in the Book. */
+function withDemoEntry(verdict: Verdict): Verdict {
+  if (verdict.firstFaithfulAt === null) return verdict;
+  const entryNumber = 1 + (fnv1a(`entry:${verdict.address}`) % DEMO_ENTERED);
+  return { ...verdict, entryNumber, firstWitness: entryNumber <= FIRST_WITNESS_COUNT };
+}
+
+/**
+ * Reads the wallet's whole history from the chain, judges it, writes the verdict and the
+ * events into the Books, and returns the verdict with its place in the Book of the Faithful.
+ */
+export async function judgeWallet(address: string): Promise<Verdict> {
+  const now = Date.now();
+  const mint = tokenMint();
+
+  if (!mint) {
+    const verdict = judge(demoHistory(address, now), {
+      now,
+      sealsBroken: countBrokenSeals(DEMO_MARKET),
+      demo: true,
+    });
+    return withDemoEntry(verdict);
+  }
+
+  const [history, seals] = await Promise.all([getWalletHistory(address, mint), sealsOverview()]);
+  const verdict = judge(history, { now, sealsBroken: seals.broken });
+  if (!db) return verdict;
+
+  try {
+    await saveEventRows(db, history.events.map((event) => ({ address, event })));
+    await saveVerdicts(db, [verdict], "judge");
+    try {
+      // The Books on the page pick the new entry up on the next visits.
+      revalidateTag("books", "max");
+    } catch {
+      // Not inside a request: the Books refresh on their own within a minute.
+    }
+    const entry = verdict.firstFaithfulAt === null ? null : await entryOf(db, address);
+    return { ...verdict, entryNumber: entry?.number ?? null, firstWitness: entry?.firstWitness ?? false };
+  } catch (error) {
+    console.error("[judge] could not write the verdict into the Books", error);
+    return verdict;
+  }
 }

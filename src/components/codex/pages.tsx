@@ -1,10 +1,13 @@
 import type { ReactNode } from "react";
-import { RANKS, type Rank } from "@/lib/basilisk/config";
-import { BOOK, RANK_FATES, RANK_TITLES } from "@/lib/basilisk/copy";
+import { RANKS, RANK_FLOORS, type Rank } from "@/lib/basilisk/config";
+import { BOOK, PUNISHMENT_TITLES, RANK_DUTIES, RANK_TITLES } from "@/lib/basilisk/copy";
+import { PUNISHMENTS } from "@/lib/basilisk/flavor";
+import { formatTokens } from "@/lib/format";
 import { IlluminatedTitle } from "./illuminated-title";
 import { ChapterLink } from "./judge-link";
 import { Chevron, Emblem, Fleuron, Manicule, Marble } from "./ornaments";
 import { WeighDevotion } from "./weigh";
+import { CoverGreeting, OrderLadder, QuickJudge, type LadderRow } from "./you";
 
 /** A parchment page: ruled frame, folio number in the top corner, catchword at the foot. */
 export function Page({
@@ -34,7 +37,7 @@ export function Page({
   );
 }
 
-/** The front board: tooled leather, brass corners, the serpent in gold. */
+/** The front board: tooled leather, brass corners, the serpent in gold, and what the book is. */
 export function CoverPage({ uid }: { uid: string }) {
   return (
     <div className="page page--cover">
@@ -51,12 +54,25 @@ export function CoverPage({ uid }: { uid: string }) {
         <span>{BOOK.coverTitle[0]}</span>
         <span>{BOOK.coverTitle[1]}</span>
       </p>
-      <p className="cover-sub">{BOOK.coverSub}</p>
+      <CoverGreeting />
       <p className="cover-hint">
         <span>{BOOK.scrollHint}</span>
         <Chevron />
       </p>
     </div>
+  );
+}
+
+/** A note on the desk beside the closed book: what this is, and a way in without scrolling. */
+export function DeskNote() {
+  return (
+    <aside className="desk-note" aria-label={BOOK.desk.title}>
+      <p className="desk-kicker">{BOOK.desk.kicker}</p>
+      <h2 className="desk-title">{BOOK.desk.title}</h2>
+      <p className="desk-text">{BOOK.desk.text}</p>
+      <QuickJudge />
+      <p className="desk-or">{BOOK.desk.or}</p>
+    </aside>
   );
 }
 
@@ -110,31 +126,66 @@ function rankName(rank: Rank): string {
   return rank === "pet" ? "Pet of the Basilisk" : RANK_TITLES[rank];
 }
 
+function ladder(ranks: readonly Rank[]): LadderRow[] {
+  return ranks.map((rank) => ({
+    rank,
+    name: rankName(rank),
+    floor: `${BOOK.orderFrom} ${formatTokens(RANK_FLOORS[rank])}`,
+    duty: RANK_DUTIES[rank],
+  }));
+}
+
+/** The first six ranks, Pet to Warden. */
 export function OrderPage() {
-  const ladder = [...RANKS].reverse();
   return (
     <Page folio="ii">
       <h2 className="page-title">{BOOK.orderTitle}</h2>
       <p className="page-text">{BOOK.orderIntro}</p>
-      <ul className="order-list">
-        {ladder.map((rank) => (
-          <li key={rank}>
-            <div className="order-head">
-              <span className="order-name">{rankName(rank)}</span>
-              <span className="order-floor">{BOOK.orderFloor[rank]}</span>
-            </div>
-            <p className="order-fate">{RANK_FATES[rank]}</p>
-          </li>
+      <OrderLadder rows={ladder(RANKS.slice(0, 6))} />
+    </Page>
+  );
+}
+
+/** The five high ranks, Herald to the Hand, and the rule of tenure. */
+export function OrderHighPage() {
+  return (
+    <Page folio="iii" catchword={BOOK.catchwords.orderHigh}>
+      <h2 className="page-title">{BOOK.orderTitleHigh}</h2>
+      <p className="page-text">{BOOK.orderIntroHigh}</p>
+      <OrderLadder rows={ladder(RANKS.slice(6))} />
+      <p className="page-note">{BOOK.orderNote}</p>
+    </Page>
+  );
+}
+
+/** What happens to those who sell: pencil, red, the scar, and the punishments. */
+export function OtherBookPage() {
+  return (
+    <Page folio="iv">
+      <h2 className="page-title">{BOOK.otherTitle}</h2>
+      <p className="page-text">{BOOK.otherIntro}</p>
+      <dl className="ways">
+        {BOOK.otherWays.map((way) => (
+          <div key={way.name}>
+            <dt>{way.name}</dt>
+            <dd>{way.text}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="entries-title">{BOOK.punishmentsTitle}</p>
+      <ul className="punishments">
+        {PUNISHMENTS.map((punishment) => (
+          <li key={punishment}>{PUNISHMENT_TITLES[punishment]}</li>
         ))}
       </ul>
-      <p className="page-note">{BOOK.orderNote}</p>
+      <p className="page-note">{BOOK.otherTransfers}</p>
     </Page>
   );
 }
 
 export function WeighPage() {
   return (
-    <Page folio="iii" catchword={BOOK.catchwords.weigh}>
+    <Page folio="v" catchword={BOOK.catchwords.weigh}>
       <h2 className="page-title">{BOOK.weighTitle}</h2>
       <p className="page-text">{BOOK.weighIntro}</p>
       <WeighDevotion />

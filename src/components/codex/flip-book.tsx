@@ -49,6 +49,8 @@ interface Props {
   chapters?: Chapter[];
   /** Where each chapter of the table of contents opens in this layout. */
   chapterSpreads?: Record<string, number>;
+  /** Something on the desk beside the closed book; it fades away as the book opens. */
+  aside?: ReactNode;
 }
 
 const TURN_START = 0.2;
@@ -66,7 +68,7 @@ function turnOf(t: number, k: number) {
   return easeInOut(Math.min(1, Math.max(0, local)));
 }
 
-export function FlipBook({ mode, label, leaves, base, chapters, chapterSpreads }: Props) {
+export function FlipBook({ mode, label, leaves, base, chapters, chapterSpreads, aside }: Props) {
   const sectionRef = useRef<HTMLElement>(null);
   const reduce = useReducedMotion();
   const count = leaves.length;
@@ -76,6 +78,9 @@ export function FlipBook({ mode, label, leaves, base, chapters, chapterSpreads }
   const t = useSpring(raw, { stiffness: 220, damping: 32, mass: 0.6, restDelta: 0.0005 });
   // A closed book shows only its cover: shift it left by half a page so the cover sits centred.
   const shift = useTransform(t, [TURN_START, TURN_END], mode === "spread" ? ["-25%", "0%"] : ["0%", "0%"]);
+
+  const asideOpacity = useTransform(t, [0, 0.3], [1, 0]);
+  const asideVisibility = useTransform(t, (value) => (value < 0.3 ? "visible" : "hidden"));
 
   const activeRef = useRef(0);
   const [active, setActive] = useState(0);
@@ -126,6 +131,11 @@ export function FlipBook({ mode, label, leaves, base, chapters, chapterSpreads }
   return (
     <section ref={sectionRef} className={`book-scroll book-scroll--${mode}`} style={style} aria-label={label}>
       <div className="book-stage">
+        {aside && (
+          <motion.div className="desk-aside" style={reduce ? undefined : { opacity: asideOpacity, visibility: asideVisibility }}>
+            {aside}
+          </motion.div>
+        )}
         <motion.div className={`book book--${mode}`} style={reduce ? undefined : { x: shift }}>
           <div className="book-board" aria-hidden="true" />
           {leaves.map((leaf, k) => (

@@ -4,10 +4,12 @@ import {
   FAITHFUL_THRESHOLD,
   RANKS,
   RANK_FLOORS,
+  TENURE_MAX_STEPS,
   TENURE_RANK_CAP,
   TENURE_STEP_DAYS,
   type Rank,
 } from "./config";
+import { rankByBalance } from "./judge";
 import type { Verdict } from "./types";
 
 /** How far a wallet is from the next rank: tokens to buy, or days to hold without a sale. */
@@ -26,8 +28,13 @@ export function nextRankStep(
   const next = RANKS[RANKS.indexOf(verdict.rank) + 1];
   if (!next) return null;
   const more = Math.max(0, RANK_FLOORS[next] - verdict.balance);
+  // Tenure lifts a faithful wallet up to the cap, a limited number of steps above its balance rank.
+  const base = rankByBalance(verdict.balance) ?? verdict.rank;
+  const stepsUsed = RANKS.indexOf(verdict.rank) - RANKS.indexOf(base);
   const tenureCanLift =
-    verdict.status === "faithful" && RANKS.indexOf(next) <= RANKS.indexOf(TENURE_RANK_CAP);
+    verdict.status === "faithful" &&
+    stepsUsed < TENURE_MAX_STEPS &&
+    RANKS.indexOf(next) <= RANKS.indexOf(TENURE_RANK_CAP);
   const days = tenureCanLift ? TENURE_STEP_DAYS - (verdict.tenureDays % TENURE_STEP_DAYS) : null;
   return { rank: next, more, days };
 }

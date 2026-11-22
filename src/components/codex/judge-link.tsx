@@ -13,8 +13,14 @@ export function scrollToJudgment() {
   document.getElementById("judgment")?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
 }
 
-export function requestJudgment(address: string) {
-  window.dispatchEvent(new CustomEvent<string>(JUDGE_EVENT, { detail: address }));
+/** What "Your page" is asked to judge. `mine` is true when the visitor typed their own wallet. */
+export interface JudgeRequest {
+  address: string;
+  mine: boolean;
+}
+
+export function requestJudgment(address: string, mine = false) {
+  window.dispatchEvent(new CustomEvent<JudgeRequest>(JUDGE_EVENT, { detail: { address, mine } }));
   scrollToJudgment();
 }
 

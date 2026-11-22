@@ -35,16 +35,16 @@ function fallbackSeal(overview: SealsOverview): number {
 export function SealsPage({ overview }: { overview: SealsOverview }) {
   const next = overview.next;
   return (
-    <Page folio="iv">
+    <Page folio="vi">
       <h2 className="page-title">{CODEX.sealsTitle}</h2>
       <p className="page-text">{BOOK.sealsIntro}</p>
       <SealsGrid seals={views(overview)} fallback={fallbackSeal(overview)} />
       <div className="mcap">
         <div className="mcap-row">
           <span>{BOOK.mcapNow}</span>
-          <strong>{formatUsd(overview.mcapUsd)}</strong>
+          <strong>{overview.source === "none" ? BOOK.mcapUnknown : formatUsd(overview.mcapUsd)}</strong>
         </div>
-        {next && (
+        {next && overview.source !== "none" && (
           <>
             <div className="ink-bar" aria-hidden="true">
               <span style={{ "--p": `${Math.round(next.progress * 100)}%` } as CSSProperties} />
@@ -62,8 +62,12 @@ export function SealsPage({ overview }: { overview: SealsOverview }) {
 /** Right page: the seal you touched, read aloud. */
 export function ReadingPage({ overview }: { overview: SealsOverview }) {
   return (
-    <Page folio="v" catchword={BOOK.catchwords.reading}>
-      <SealReading seals={views(overview)} fallback={fallbackSeal(overview)} mcapUsd={overview.mcapUsd} />
+    <Page folio="vii" catchword={BOOK.catchwords.reading}>
+      <SealReading
+        seals={views(overview)}
+        fallback={fallbackSeal(overview)}
+        mcapUsd={overview.source === "none" ? null : overview.mcapUsd}
+      />
     </Page>
   );
 }

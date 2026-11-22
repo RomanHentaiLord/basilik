@@ -12,23 +12,22 @@ import {
 } from "@/lib/basilisk/copy";
 import { PUNISHMENTS } from "@/lib/basilisk/flavor";
 import { rankByBalance } from "@/lib/basilisk/judge";
-import { formatTokens } from "@/lib/format";
+import { formatTokens, formatTokensShort } from "@/lib/format";
 
 type Deeds = keyof typeof BOOK.deeds;
 type Tone = "ink" | "pencil" | "red" | "outside";
 
 /**
- * The slider runs through fixed marks, log-scaled between them, so every rank gets room:
- * 10,000 at the left end, then 100K, 1M, 5M, 10M, and 30 million at the right.
+ * The slider puts every rank floor at an even step (log-scaled in between), so all eleven ranks
+ * get room: 2,000 at the left end, Pet at 20,000 … the Hand at 50 million, 80 million at the right.
  */
 const STEPS = 1000;
+const FIRST = 0.08;
+const STRIDE = (0.94 - FIRST) / (RANKS.length - 1);
 const MARKS = [
-  { at: 0, tokens: 10_000 },
-  { at: 0.2, tokens: 100_000 },
-  { at: 0.45, tokens: 1_000_000 },
-  { at: 0.66, tokens: 5_000_000 },
-  { at: 0.83, tokens: 10_000_000 },
-  { at: 1, tokens: 30_000_000 },
+  { at: 0, tokens: 2_000 },
+  ...RANKS.map((rank, i) => ({ at: FIRST + i * STRIDE, tokens: RANK_FLOORS[rank] })),
+  { at: 1, tokens: 80_000_000 },
 ];
 
 function tokensAt(position: number): number {
@@ -105,17 +104,13 @@ function reckon(tokens: number, deeds: Deeds): Reckoning {
   };
 }
 
-const TICKS: { rank: Rank; label: string }[] = [
-  { rank: "pet", label: "Pet" },
-  { rank: "keeper", label: "Keeper" },
-  { rank: "priest", label: "Priest" },
-  { rank: "apostle", label: "Apostle" },
-];
+/** Every floor gets a tick; a few carry a number. */
+const LABELLED: Rank[] = ["pet", "scribe", "warden", "archon", "hand"];
 
 /** "Weigh your devotion": a slider and three deeds, and the title the Basilisk would give. */
 export function WeighDevotion() {
   const id = useId();
-  const [position, setPosition] = useState(() => positionOf(350_000));
+  const [position, setPosition] = useState(() => positionOf(150_000));
   const [deeds, setDeeds] = useState<Deeds>("held");
   const tokens = tokensAt(position);
   const result = reckon(tokens, deeds);
@@ -142,9 +137,13 @@ export function WeighDevotion() {
           style={{ "--fill": `${(position / STEPS) * 100}%` } as CSSProperties}
         />
         <div className="weigh-ticks" aria-hidden="true">
-          {TICKS.map((tick) => (
-            <span key={tick.rank} style={{ "--p": positionOf(RANK_FLOORS[tick.rank]) / STEPS } as CSSProperties}>
-              {tick.label}
+          {RANKS.map((rank) => (
+            <span
+              key={rank}
+              className={LABELLED.includes(rank) ? undefined : "tick-only"}
+              style={{ "--p": positionOf(RANK_FLOORS[rank]) / STEPS } as CSSProperties}
+            >
+              {LABELLED.includes(rank) ? formatTokensShort(RANK_FLOORS[rank]) : ""}
             </span>
           ))}
         </div>

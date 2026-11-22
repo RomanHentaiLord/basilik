@@ -1,3 +1,4 @@
+import { FIRST_WITNESS_COUNT } from "@/lib/basilisk/config";
 import { BOOK } from "@/lib/basilisk/copy";
 import { formatTokens, formatTokensShort } from "@/lib/format";
 import { shortAddress } from "@/lib/solana/address";
@@ -8,7 +9,7 @@ import { Page } from "./pages";
 /** Left page of the last spread: the Faithful, written in ink. */
 export function FaithfulPage({ books }: { books: BooksOverview }) {
   return (
-    <Page folio="vi">
+    <Page folio="viii">
       <h2 className="page-title">{BOOK.faithfulTitle}</h2>
       <p className="count">
         <strong>{formatTokens(books.faithful)}</strong>
@@ -17,6 +18,25 @@ export function FaithfulPage({ books }: { books: BooksOverview }) {
       <p className="page-text" style={{ fontStyle: "italic" }}>
         {formatTokens(books.forgiven)} {BOOK.forgivenCount}
       </p>
+      <div className="witnesses">
+        <p className="witnesses-title gilt-ink">{BOOK.witnessesTitle}</p>
+        <p className="witnesses-text">
+          {BOOK.witnessesTaken(books.firstWitnesses.taken, FIRST_WITNESS_COUNT)}
+          {books.firstWitnesses.names.length > 0 && <> {BOOK.witnessesFirst} </>}
+          {books.firstWitnesses.names.map((row, index) => (
+            <span key={row.address}>
+              <JudgeLink
+                address={row.address}
+                className="witness-name"
+                label={`${BOOK.readEntry}: ${shortAddress(row.address)}, ${row.title}`}
+              >
+                {shortAddress(row.address)}
+              </JudgeLink>
+              {index < books.firstWitnesses.names.length - 1 ? ", " : "."}
+            </span>
+          ))}
+        </p>
+      </div>
       {books.latestFaithful.length > 0 && (
         <>
           <p className="entries-title">{BOOK.newestInk}</p>
@@ -36,10 +56,7 @@ export function FaithfulPage({ books }: { books: BooksOverview }) {
           </ul>
         </>
       )}
-      <p className="page-note">
-        {BOOK.firstWitnesses}
-        {books.demo && ` ${BOOK.demoNames}`}
-      </p>
+      {books.demo && <p className="page-note">{BOOK.demoNames}</p>}
     </Page>
   );
 }
@@ -47,7 +64,7 @@ export function FaithfulPage({ books }: { books: BooksOverview }) {
 /** Right page of the last spread: the Traitors, written in red and struck through. */
 export function TraitorsPage({ books }: { books: BooksOverview }) {
   return (
-    <Page folio="vii" catchword={BOOK.catchwords.traitors}>
+    <Page folio="ix" catchword={BOOK.catchwords.traitors}>
       <h2 className="page-title">{BOOK.traitorsTitle}</h2>
       <p className="count count--red">
         <strong>{formatTokens(books.traitors)}</strong>

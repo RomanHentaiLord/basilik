@@ -14,6 +14,8 @@ describe("seals", () => {
   it("seals break in order and never close again", () => {
     expect(countBrokenSeals({ mcapUsd: 312_000, graduated: true })).toBe(3);
     expect(countBrokenSeals({ mcapUsd: 90_000, graduated: true, athMcapUsd: 600_000 })).toBe(4);
+    // A known high decides: one unconfirmed reading above it breaks nothing.
+    expect(countBrokenSeals({ mcapUsd: 14_000_000_000, graduated: true, athMcapUsd: 312_000 })).toBe(3);
     expect(countBrokenSeals({ mcapUsd: 12_000_000, graduated: true })).toBe(7);
   });
 
