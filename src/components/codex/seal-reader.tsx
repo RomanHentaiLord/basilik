@@ -103,7 +103,16 @@ export function SealsGrid({ seals, fallback }: { seals: SealView[]; fallback: nu
 }
 
 /** The facing page: what the chosen seal unlocks and, once broken, what the Basilisk said. */
-export function SealReading({ seals, fallback, mcapUsd }: { seals: SealView[]; fallback: number; mcapUsd: number }) {
+export function SealReading({
+  seals,
+  fallback,
+  mcapUsd,
+}: {
+  seals: SealView[];
+  fallback: number;
+  /** Null when no market source answered. */
+  mcapUsd: number | null;
+}) {
   const reduce = useReducedMotion();
   const current = useSelectedSeal(fallback);
   const seal = seals.find((item) => item.number === current) ?? seals[0];
@@ -142,7 +151,7 @@ export function SealReading({ seals, fallback, mcapUsd }: { seals: SealView[]; f
             <p className="page-text" style={{ fontStyle: "italic", color: "var(--ink-muted)" }}>
               {BOOK.sealUnder}
             </p>
-            {seal.usd !== null && (
+            {seal.usd !== null && mcapUsd !== null && (
               <div className="mcap" style={{ marginTop: "1.4em" }}>
                 <div className="mcap-row">
                   <span>{BOOK.mcapNow}</span>

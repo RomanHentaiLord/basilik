@@ -201,6 +201,7 @@ export const BOOK = {
 
   sealsIntro: "Each seal breaks when the coin reaches its mark, and the Basilisk says a little more. Touch a seal to read it.",
   mcapNow: "Market cap now",
+  mcapUnknown: "unknown for now",
   mcapTo: "to the next seal",
   sealNames: ["", "The First Seal", "The Second Seal", "The Third Seal", "The Fourth Seal", "The Fifth Seal", "The Sixth Seal", "The Seventh Seal"],
   sealBroken: "Broken",

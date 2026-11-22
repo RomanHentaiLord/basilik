@@ -13,8 +13,24 @@ import { events, indexerState, wallets } from "./schema";
 
 export type AnyDb = PgDatabase<PgQueryResultHKT, typeof schema>;
 
-/** indexer_state key holding the highest market cap ever seen (seals never close). */
+/** indexer_state key holding what the market has reached so far (seals never close). */
 export const MARKET_ATH_KEY = "market-ath";
+
+/** Highest market cap ever seen, and whether the coin has left the bonding curve. */
+export interface MarketMemory {
+  usd: number;
+  graduated?: boolean;
+}
+
+/** The stored memory plus a new reading. `changed` says whether it needs saving. */
+export function mergeMarketMemory(
+  memory: MarketMemory | null,
+  reading: { mcapUsd: number; graduated: boolean },
+): MarketMemory & { changed: boolean } {
+  const usd = Math.max(memory?.usd ?? 0, reading.mcapUsd);
+  const graduated = Boolean(memory?.graduated) || reading.graduated;
+  return { usd, graduated, changed: usd !== (memory?.usd ?? 0) || graduated !== Boolean(memory?.graduated) };
+}
 
 export interface TraitorRow {
   address: string;

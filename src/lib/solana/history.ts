@@ -1,7 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import type { WalletEvent, WalletHistory } from "@/lib/basilisk/types";
 import { parseTransaction, type ParsedTransaction } from "./parse";
-import { rpc, rpcBatch } from "./rpc";
+import { getTransactions, rpc } from "./rpc";
 
 const TOKEN_PROGRAM = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 const TOKEN_2022_PROGRAM = new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
@@ -87,20 +87,9 @@ export async function getWalletHistory(
   const signatureLists = await Promise.all(tokenAccounts.map(signaturesFor));
   const signatures = [...new Set(signatureLists.flat())].slice(0, MAX_SIGNATURES);
 
-  const transactions: ParsedTransaction[] = [];
-  for (let i = 0; i < signatures.length; i += TX_BATCH) {
-    const chunk = signatures.slice(i, i + TX_BATCH);
-    const results = await rpcBatch<ParsedTransaction | null>(
-      chunk.map((signature) => ({
-        method: "getTransaction",
-        params: [
-          signature,
-          { encoding: "jsonParsed", maxSupportedTransactionVersion: 0, commitment: "confirmed" },
-        ],
-      })),
-    );
-    for (const tx of results) if (tx) transactions.push(tx);
-  }
+  const transactions = (await getTransactions<ParsedTransaction>(signatures, TX_BATCH)).filter(
+    (tx): tx is ParsedTransaction => tx !== null,
+  );
 
   transactions.sort((a, b) => a.slot - b.slot);
 

@@ -1,6 +1,14 @@
 import "server-only";
-import { cacheLife } from "next/cache";
-import { entryOf, MARKET_ATH_KEY, readState, saveEventRows, saveVerdicts } from "@/db/books";
+import { cacheLife, revalidateTag } from "next/cache";
+import {
+  entryOf,
+  MARKET_ATH_KEY,
+  mergeMarketMemory,
+  readState,
+  saveEventRows,
+  saveVerdicts,
+  type MarketMemory,
+} from "@/db/books";
 import { db } from "@/db";
 import { FIRST_WITNESS_COUNT } from "@/lib/basilisk/config";
 import { demoHistory } from "@/lib/basilisk/demo";
@@ -9,7 +17,7 @@ import { judge } from "@/lib/basilisk/judge";
 import { countBrokenSeals, nextSeal, SEALS, type MarketState } from "@/lib/basilisk/seals";
 import type { Verdict } from "@/lib/basilisk/types";
 import { getWalletHistory } from "@/lib/solana/history";
-import { DEMO_MARKET, getMarketState } from "@/lib/solana/market";
+import { DEMO_MARKET, getMarketState, type MarketSource } from "@/lib/solana/market";
 import { tokenMint } from "./env";
 
 export { tokenMint };
@@ -17,19 +25,20 @@ export { tokenMint };
 /** How many imaginary wallets have entered the Book in demo mode, for entry numbers. */
 const DEMO_ENTERED = 1200;
 
-export async function marketState(): Promise<MarketState & { demo: boolean }> {
+export async function marketState(): Promise<MarketState & { demo: boolean; source: MarketSource }> {
   const mint = tokenMint();
-  if (!mint) return { ...DEMO_MARKET, demo: true };
+  if (!mint) return { ...DEMO_MARKET, demo: true, source: "demo" };
   const market = await getMarketState(mint);
-  let ath = market.mcapUsd;
+  let memory: MarketMemory | null = null;
   if (db) {
     try {
-      ath = Math.max(ath, (await readState<{ usd: number }>(db, MARKET_ATH_KEY))?.usd ?? 0);
+      memory = await readState<MarketMemory>(db, MARKET_ATH_KEY);
     } catch (error) {
-      console.error("[market] could not read the all-time high", error);
+      console.error("[market] could not read the market memory", error);
     }
   }
-  return { ...market, athMcapUsd: ath, demo: false };
+  const merged = mergeMarketMemory(memory, market);
+  return { ...market, graduated: Boolean(merged.graduated), athMcapUsd: merged.usd, demo: false };
 }
 
 /** Seals, market cap and progress. Cached for a minute: the page stays static between refreshes. */
@@ -42,6 +51,8 @@ export async function sealsOverview() {
   return {
     demo: market.demo,
     mcapUsd: market.mcapUsd,
+    /** Where the market cap came from; "none" when every source failed. */
+    source: market.source,
     broken,
     next: nextSeal(market),
     seals: SEALS.map((seal) => ({ ...seal, broken: seal.number <= broken })),
@@ -79,6 +90,12 @@ export async function judgeWallet(address: string): Promise<Verdict> {
   try {
     await saveEventRows(db, history.events.map((event) => ({ address, event })));
     await saveVerdicts(db, [verdict], "judge");
+    try {
+      // The Books on the page pick the new entry up on the next visits.
+      revalidateTag("books", "max");
+    } catch {
+      // Not inside a request: the Books refresh on their own within a minute.
+    }
     const entry = verdict.firstFaithfulAt === null ? null : await entryOf(db, address);
     return { ...verdict, entryNumber: entry?.number ?? null, firstWitness: entry?.firstWitness ?? false };
   } catch (error) {
