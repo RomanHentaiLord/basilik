@@ -42,3 +42,8 @@ next-env.d.ts
 
 # allow the env template
 !.env.example
+
+# Wallet keys never go into git (npm run altar:new keeps its file in your home folder anyway)
+altar.json
+*.keypair.json
+.basilisk/

@@ -2,8 +2,8 @@ import { PublicKey, TransactionInstruction, TransactionMessage, VersionedTransac
 
 /**
  * The Altar's burn: one BurnChecked per token account it holds the coin in. A real SPL burn
- * that lowers the supply, not a transfer to a dead address. Built unsigned on the server;
- * the Altar signs and sends it from Phantom.
+ * that lowers the supply, not a transfer to a dead address. Built unsigned here; the
+ * terminal tool (scripts/altar.ts, npm run altar:burn) signs it with the Altar's key file.
  */
 
 export const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";

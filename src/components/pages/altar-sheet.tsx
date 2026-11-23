@@ -4,7 +4,6 @@ import { ALTAR_PAGE, CODEX, LEDGER } from "@/lib/basilisk/copy";
 import { formatMoment, formatTokens, formatTokensShort } from "@/lib/format";
 import { shortAddress } from "@/lib/solana/address";
 import type { AltarOverview } from "@/server/altar";
-import { AltarRitual } from "./altar-ritual";
 
 const sol = (value: number) => value.toLocaleString("en-US", { maximumFractionDigits: 4 });
 
@@ -87,7 +86,6 @@ export function AltarSheet({ overview }: { overview: AltarOverview }) {
             <li key={step}>{step}</li>
           ))}
         </ol>
-        {altar && !demo && <AltarRitual altar={altar} />}
         <p className="altar-ledger">
           <Link className="codex-link codex-focus" href="/burns">
             {ALTAR_PAGE.ledger}

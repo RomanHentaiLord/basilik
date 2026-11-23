@@ -1,7 +1,7 @@
 import "server-only";
 import { altarOfferings } from "@/db/books";
 import { db } from "@/db";
-import { burnAllTransaction, tokenAccountsFrom, type TokenAccount } from "@/lib/solana/burn";
+import { tokenAccountsFrom, type TokenAccount } from "@/lib/solana/burn";
 import { rpc } from "@/lib/solana/rpc";
 import { sealsOverview } from "./basilisk";
 import { altarWallet } from "./burns";
@@ -93,23 +93,4 @@ export async function altarOverview(): Promise<AltarOverview> {
     })),
     lastOffering: offerings?.last ?? null,
   };
-}
-
-export class AltarError extends Error {}
-
-/**
- * An unsigned transaction that burns every token the Altar holds. Only for the Altar itself:
- * Phantom signs and sends it, so the server never sees a key.
- */
-export async function prepareBurn(owner: string): Promise<{ transaction: string; tokens: number }> {
-  const altar = altarWallet();
-  const mint = tokenMint();
-  if (!mint || !altar) throw new AltarError("The Altar is not consecrated yet: the coin or ALTAR_WALLET is not set.");
-  if (owner !== altar) throw new AltarError("Only the Altar can make an offering here.");
-
-  const accounts = await altarAccounts(altar, mint);
-  if (accounts.length === 0) throw new AltarError("The Altar holds none of the coin. Buy it with the fees first.");
-  const { value } = await rpc<{ value: { blockhash: string } }>("getLatestBlockhash", [{ commitment: "confirmed" }]);
-  const bytes = burnAllTransaction({ owner: altar, mint, accounts, blockhash: value.blockhash });
-  return { transaction: Buffer.from(bytes).toString("base64"), tokens: uiAmount(accounts) };
 }
