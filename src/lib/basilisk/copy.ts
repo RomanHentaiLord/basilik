@@ -355,10 +355,12 @@ function shareInWords(share: number): string {
 
 const THRESHOLD = FAITHFUL_THRESHOLD.toLocaleString("en-US");
 const CREATOR_FEE = `${(CURVE_CREATOR_FEE * 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}%`;
-const ALTAR_SHARE = shareInWords(ALTAR_BURN_SHARE);
+const BURNS_ALL = ALTAR_BURN_SHARE >= 1;
 
 /** The Altar's rule, the same words on the lore page and on the Ledger of Offerings. */
-export const ALTAR_RULE = `When a seal breaks, the Altar takes ${ALTAR_SHARE} of the SOL it has received since the last seal, buys the coin on the curve and burns every token it bought.`;
+export const ALTAR_RULE = BURNS_ALL
+  ? "When a seal breaks, the Altar spends all the SOL it has received since the last seal on the coin, keeping only crumbs for network fees, and burns every token it bought. It keeps nothing for itself."
+  : `When a seal breaks, the Altar takes ${shareInWords(ALTAR_BURN_SHARE)} of the SOL it has received since the last seal, buys the coin on the curve and burns every token it bought.`;
 
 /** The lore page: the whole story, chapter by chapter. Glosses are the plain-words version in the margin. */
 export const LORE = {
@@ -427,9 +429,11 @@ export const LORE = {
     altar: {
       roman: "VI",
       title: "The Altar",
-      gloss: `Fees arrive as SOL. At every seal, ${ALTAR_SHARE} of them buy the coin, and all of it is burned.`,
+      gloss: BURNS_ALL
+        ? "Fees arrive as SOL. At every seal, all of them buy the coin, and everything bought is burned."
+        : `Fees arrive as SOL. At every seal, ${shareInWords(ALTAR_BURN_SHARE)} of them buy the coin, and everything bought is burned.`,
       text: [
-        `Every trade on the curve pays pump.fun a fee, and ${CREATOR_FEE} of the trade goes to the wallet that created the coin, in SOL. That wallet is the Altar.`,
+        `Every trade on the curve pays pump.fun a fee, and ${CREATOR_FEE} of the trade goes to the coin's fee wallet, in SOL. That wallet is the Altar, and it is used for nothing else.`,
         `${ALTAR_RULE} The buy carries the curve toward the next seal. The burn makes sure those tokens can never come back as a sale.`,
         "It is a real burn. The token program destroys the tokens and the supply shrinks. Nothing is sent to a dead address, and nothing can be undone.",
         "Anyone may make an offering. Burn your own tokens and the Ledger of Offerings writes it under your name, next to the Altar’s.",
@@ -460,7 +464,7 @@ export const LEDGER = {
   byAltar: "by the Altar",
   byHolders: "by holders",
   ruleTitle: "The rule of the Altar",
-  rule: `The Altar is the wallet that created the coin: pump.fun pays it ${CREATOR_FEE} of every trade on the curve, in SOL. ${ALTAR_RULE}`,
+  rule: `The Altar is the coin's fee wallet: pump.fun pays it ${CREATOR_FEE} of every trade on the curve, in SOL. ${ALTAR_RULE}`,
   altarIs: "The Altar is",
   altarUnset: "The Altar’s address is written here at launch.",
   copyAltar: "Copy the Altar’s address",

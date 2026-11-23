@@ -33,10 +33,11 @@ export const REPENTANCE_SEAL = 3;
 
 /**
  * The Altar's rule, written on the lore and burns pages as a public promise: when a seal breaks,
- * the creator wallet spends this share of the creator fees received since the previous seal on
- * the coin, and burns everything it bought. Change it only together with what the Altar does.
+ * the fee wallet spends this share of the creator fees received since the previous seal on the
+ * coin (all of them, less a little SOL for network fees), and burns everything it bought.
+ * Change it only together with what the Altar does.
  */
-export const ALTAR_BURN_SHARE = 0.5;
+export const ALTAR_BURN_SHARE = 1;
 
 /** pump.fun's creator fee on the bonding curve, paid in SOL (pump.fun/docs/fees, November 2026). */
 export const CURVE_CREATOR_FEE = 0.003;
