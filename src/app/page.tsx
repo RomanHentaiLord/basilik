@@ -41,7 +41,7 @@ export default async function Home() {
     seals: <SealsPage overview={seals} />,
     reading: <ReadingPage overview={seals} />,
     faithful: <FaithfulPage books={books} />,
-    traitors: <TraitorsPage books={books} />,
+    traitors: <TraitorsPage books={books} sealsBroken={seals.broken} />,
   });
 
   const wide = pages("wide");
@@ -96,7 +96,7 @@ export default async function Home() {
           base={narrow.traitors}
           chapterSpreads={singleChapters}
         />
-        <JudgmentSection sealsBroken={seals.broken} mint={mint} />
+        <JudgmentSection sealsBroken={seals.broken} mint={mint} psalm={seals.psalm} />
       </main>
       <TraitorFeed />
     </>

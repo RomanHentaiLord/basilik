@@ -7,6 +7,7 @@ import type { ParsedTransaction } from "@/lib/solana/parse";
 import { getMarketState, PROVIDERS } from "@/lib/solana/market";
 import { getTransactions, rpc } from "@/lib/solana/rpc";
 import { tokenMint } from "./env";
+import { speakAfterPass } from "./voice";
 import { runIndexer, type ChainSource, type IndexerResult, type SignatureInfo } from "./indexer-core";
 
 /** Runs started by visitors wait at least this long between each other. */
@@ -41,6 +42,12 @@ export type IndexerOutcome =
       /** Share of the bonding curve sold, in percent. */
       curvePercent: number;
       sealsBroken: number;
+      /** The Basilisk's mood this pass, null when it could not speak. */
+      mood: "calm" | "grim" | null;
+      /** Seals that broke and spoke during this pass. */
+      sealsSpoken: number[];
+      /** Today's psalm: written in this pass, kept from an earlier one, or none before the first seal. */
+      psalm: "kept" | "written" | "none";
     } & IndexerResult)
   | { ran: false; reason: "demo" | "no-database" | "no-rpc" | "recent" | "busy" };
 
@@ -88,6 +95,21 @@ export async function runIndexerOnce({ force = false }: { force?: boolean } = {}
     const result = await runIndexer({ db, mint, source: rpcSource(mint), now, sealsBroken, budget: BUDGET, exclude });
     await writeState(db, "last-run", { at: now, scanned: result.scanned, events: result.events });
 
+    // A seal that has just broken speaks once, and the psalm is written once a day.
+    let voice: Awaited<ReturnType<typeof speakAfterPass>> | null = null;
+    try {
+      voice = await speakAfterPass(db, {
+        now,
+        broken: sealsBroken,
+        mcapUsd: market.mcapUsd,
+        curve: market.curve ?? memory.lastCurve,
+        curveHigh: memory.curveHigh,
+      });
+      if (voice.sealsSpoken.length > 0) console.log(`[indexer] seals spoke: ${voice.sealsSpoken.join(", ")}`);
+    } catch (error) {
+      console.error("[indexer] the Basilisk could not speak", error);
+    }
+
     try {
       revalidateTag("books", "max");
       revalidateTag("market", "max");
@@ -102,6 +124,9 @@ export async function runIndexerOnce({ force = false }: { force?: boolean } = {}
       graduated: memory.graduated,
       curvePercent: Math.round((market.curve ?? memory.lastCurve) * 1000) / 10,
       sealsBroken,
+      mood: voice?.mood ?? null,
+      sealsSpoken: voice?.sealsSpoken ?? [],
+      psalm: voice?.psalm ?? "none",
       ...result,
     };
   } finally {

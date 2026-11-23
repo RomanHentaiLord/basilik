@@ -73,4 +73,15 @@ export interface Verdict {
   firstWitness: boolean;
   /** True when the verdict was produced from simulated data (no token yet). */
   demo: boolean;
+  /** What the Basilisk says to this wallet; filled in by the server. */
+  prophecy?: WalletProphecy;
+}
+
+/** The words on a wallet's page, under its verdict. */
+export interface WalletProphecy {
+  /** "Your prophecy, at the second seal"; null while every seal is whole. */
+  label: string | null;
+  text: string;
+  /** From the fourth seal, a traitor's own named punishment. */
+  punishment: string | null;
 }

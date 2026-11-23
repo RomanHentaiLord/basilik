@@ -1,5 +1,6 @@
-import { FIRST_WITNESS_COUNT } from "@/lib/basilisk/config";
+import { FIRST_WITNESS_COUNT, PUNISHMENT_SEAL } from "@/lib/basilisk/config";
 import { BOOK } from "@/lib/basilisk/copy";
+import { namedPunishment } from "@/lib/basilisk/prophecy";
 import { formatTokens, formatTokensShort } from "@/lib/format";
 import { shortAddress } from "@/lib/solana/address";
 import type { BooksOverview } from "@/server/books";
@@ -62,7 +63,9 @@ export function FaithfulPage({ books }: { books: BooksOverview }) {
 }
 
 /** Right page of the last spread: the Traitors, written in red and struck through. */
-export function TraitorsPage({ books }: { books: BooksOverview }) {
+export function TraitorsPage({ books, sealsBroken }: { books: BooksOverview; sealsBroken: number }) {
+  // From the fourth seal each traitor's punishment has their name on it: the newest is read out.
+  const newest = sealsBroken >= PUNISHMENT_SEAL ? books.latestTraitors[0] : undefined;
   return (
     <Page folio="ix" catchword={BOOK.catchwords.traitors}>
       <h2 className="page-title">{BOOK.traitorsTitle}</h2>
@@ -90,6 +93,14 @@ export function TraitorsPage({ books }: { books: BooksOverview }) {
               </li>
             ))}
           </ul>
+          {newest && (
+            <div className="sentence">
+              <p className="entries-title">{BOOK.newestSentence}</p>
+              <p className="sentence-words">
+                {namedPunishment({ address: newest.address, flavor: newest.flavor, betrayalAmount: newest.amount })}
+              </p>
+            </div>
+          )}
         </>
       ) : (
         <p className="page-text" style={{ fontStyle: "italic", color: "var(--ink-muted)" }}>

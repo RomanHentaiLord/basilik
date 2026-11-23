@@ -1,5 +1,6 @@
 import { ALTAR_BURN_SHARE, CURVE_CREATOR_FEE, FAITHFUL_THRESHOLD, FIRST_WITNESS_COUNT, type Rank } from "./config";
 import type { PetSpecies, Punishment } from "./flavor";
+import type { Status } from "./types";
 
 /**
  * Every word the site shows about a verdict. English only, like the rest of the site.
@@ -208,6 +209,8 @@ export const BOOK = {
   mcapTo: "to the next seal",
   sealNames: ["", "The First Seal", "The Second Seal", "The Third Seal", "The Fourth Seal", "The Fifth Seal", "The Sixth Seal", "The Seventh Seal"],
   sealBroken: "Broken",
+  sealBrokenOn: "Broken on",
+  psalmOf: (day: string) => `Psalm of the day, ${day}`,
   sealNext: "Next to break",
   sealWhole: "Still whole",
   sealUnder: "Its words are still under the wax.",
@@ -225,6 +228,7 @@ export const BOOK = {
   traitorsTitle: "The Book of Traitors",
   traitorsCount: "names written in red",
   newestRed: "Newest in red",
+  newestSentence: "The newest sentence",
   readEntry: "Read this entry",
   demoNames: "Imaginary names until the coin is minted. Touch one to read its page.",
 
@@ -275,7 +279,9 @@ export const JUDGMENT = {
   toEnter: "To enter the Book",
   nothingYet: "Nothing. Yet.",
   prophecyFor: (ordinal: string) => `The ${ordinal} seal, to you`,
+  personalFor: (ordinal: string) => `Your prophecy, at the ${ordinal} seal`,
   prophecyOutside: "What the Faithful were told",
+  sentence: "Your sentence",
   silent: "The Basilisk has not spoken yet. The first seal is still whole.",
   copyLink: "Copy link to this page",
   linkCopied: "Link copied",
@@ -312,7 +318,7 @@ export const ORDINALS = ["", "first", "second", "third", "fourth", "fifth", "six
 
 /**
  * What the Basilisk says when a seal breaks. Lore, never price talk.
- * Stage 3 replaces these with generated prophecies; these stay as the fallback.
+ * With a model configured, the indexer asks it for new words when a seal breaks; these stay as the fallback.
  */
 export const SEAL_PROPHECIES: Record<number, { faithful: string; traitors: string }> = {
   1: {
@@ -454,6 +460,75 @@ export const LORE = {
   readLedger: "Read the Ledger of Offerings",
 } as const;
 
+/** The Altar's own page (/altar): what it holds, what it owes, and the burn button. */
+export const ALTAR_PAGE = {
+  title: "The Altar",
+  lede: "The wallet that receives the coin's creator fees, and burns them. At every broken seal it claims the fees, buys the coin with them and burns everything it bought. Anyone can watch. Only the Altar can make the offering.",
+  address: "The Altar's wallet",
+  holds: "It holds",
+  sol: "SOL",
+  tokens: "of the coin",
+  unknown: "the chain did not answer",
+  sealsTitle: "The seals and their offerings",
+  answered: "Answered",
+  owed: "An offering is owed",
+  noSeals: "No seal has broken yet. The Altar waits.",
+  lastOffering: "Last offering",
+  ritualTitle: "The ritual",
+  steps: [
+    "Claim the creator fees on pump.fun, signed by the Altar.",
+    "Spend the SOL on the coin. Keep a little for network fees.",
+    "Burn everything below: connect the Altar in Phantom and make the offering.",
+  ],
+  notSet: "The Altar is not consecrated yet. After launch, set ALTAR_WALLET to the wallet that receives the creator fees.",
+  demo: "Before launch there is nothing to burn. The seals below are the demo's.",
+  connect: "Connect the Altar",
+  connecting: "Waiting for Phantom…",
+  noWallet: "No Solana wallet in this browser.",
+  openInPhantom: "Open this page in Phantom",
+  notAltar: (short: string) => `${short} is not the Altar. Switch to the Altar's account in Phantom and connect again.`,
+  connected: (short: string) => `The Altar is here: ${short}.`,
+  burnAll: "Burn everything",
+  preparing: "Counting the offering…",
+  confirm: (tokens: string) => `Burn ${tokens} tokens? A burn cannot be undone.`,
+  confirmYes: "Burn them",
+  confirmNo: "Not now",
+  signing: "Sign the offering in Phantom…",
+  done: "Burned.",
+  doneNote: "The offering will appear in the Ledger within a few minutes.",
+  seeTx: "See the transaction",
+  failed: "The offering did not go through:",
+  ledger: "The Ledger of Offerings",
+} as const;
+
+/** The verdict's own page (/v/<address>) and its card image for X. */
+export const CARD = {
+  judged: "The Basilisk has judged",
+  books: {
+    witness: "Outside the Books",
+    sympathizer: "Outside the Books, for now",
+    faithful: "Book of the Faithful",
+    forgiven: "Book of the Faithful, with a scar",
+    doubter: "Book of the Faithful, in pencil",
+    traitor: "Book of Traitors",
+  } satisfies Record<Status, string>,
+  entry: (n: number) => `entry No. ${n.toLocaleString("en-US")}`,
+  brand: "The Basilisk remembers",
+  invite: (host: string | null) => (host ? `Find your own page at ${host}` : "Find your own page in the Book"),
+  fallbackKicker: "A book that remembers every wallet",
+  fallbackTitle: "The Basilisk remembers",
+  fallbackLine: "The Faithful are written in ink, traitors in red.",
+  fallbackWords: "Write your wallet into the Book. It will tell you where you stand.",
+  alt: "The Basilisk's verdict on a wallet",
+  pageTitle: (short: string, title: string) => `${short}, ${title} | The Basilisk remembers`,
+  description: (short: string, title: string, line: string) => `The Basilisk has judged ${short}: ${title}. ${line}`,
+  notFoundTitle: "No such wallet",
+  notFound: "This is not a Solana wallet address, or the Basilisk could not read the chain just now.",
+  openInBook: "Open this page in the Book",
+  judgeYours: "Judge your own wallet",
+  loading: "The Basilisk is reading this wallet…",
+} as const;
+
 /** The burns page. */
 export const LEDGER = {
   title: "The Ledger of Offerings",
@@ -467,6 +542,7 @@ export const LEDGER = {
   rule: `The Altar is the coin's fee wallet: pump.fun pays it ${CREATOR_FEE} of every trade on the curve, in SOL. ${ALTAR_RULE}`,
   altarIs: "The Altar is",
   altarUnset: "The Altar’s address is written here at launch.",
+  altarPage: "The Altar’s own page",
   copyAltar: "Copy the Altar’s address",
   columns: { number: "No.", when: "When", by: "Offered by", amount: "Burned", proof: "Proof" },
   burnedShort: "burned",

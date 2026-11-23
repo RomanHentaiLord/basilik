@@ -1,8 +1,10 @@
+import { altarRouter } from "./routers/altar";
 import { basiliskRouter } from "./routers/basilisk";
 import { createCallerFactory, createTRPCRouter } from "./trpc";
 
 export const appRouter = createTRPCRouter({
   basilisk: basiliskRouter,
+  altar: altarRouter,
 });
 
 export type AppRouter = typeof appRouter;

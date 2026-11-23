@@ -28,8 +28,12 @@ export const REDEMPTION_MS = DAY_MS;
  */
 export const TENURE_STEPS_MS = [HOUR_MS, 2 * HOUR_MS, 3 * HOUR_MS, DAY_MS, 7 * DAY_MS] as const;
 
+/** From this seal each wallet hears its own prophecy on its page. */
+export const PERSONAL_SEAL = 2;
 /** Seal number that opens repentance (forgiveness). */
 export const REPENTANCE_SEAL = 3;
+/** From this seal each traitor gets a punishment with its name on it. */
+export const PUNISHMENT_SEAL = 4;
 
 /**
  * The Altar's rule, written on the lore and burns pages as a public promise: when a seal breaks,

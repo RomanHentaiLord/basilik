@@ -77,7 +77,7 @@ export const indexerState = pgTable("indexer_state", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** Broken seals and their two-part prophecies. */
+/** Broken seals and their two-part prophecies, written by the indexer when each seal breaks. */
 export const seals = pgTable("seals", {
   number: integer("number").primaryKey(),
   brokenAt: timestamp("broken_at", { withTimezone: true }).notNull().defaultNow(),
@@ -86,13 +86,19 @@ export const seals = pgTable("seals", {
   prophecyTraitors: text("prophecy_traitors"),
 });
 
-/** Personal prophecies, cached per wallet per seal so each costs one model call. */
+/**
+ * Personal prophecies written by the model, cached per wallet per seal so each costs one call.
+ * A new call is made only when the wallet's status changes (a Faithful who sells hears new words).
+ * Template prophecies are not stored: they are the same every time anyway.
+ */
 export const prophecies = pgTable(
   "prophecies",
   {
     address: text("address").notNull(),
     seal: integer("seal").notNull(),
     text: text("text").notNull(),
+    /** The wallet's status when the words were written. */
+    status: text("status"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.address, table.seal] })],

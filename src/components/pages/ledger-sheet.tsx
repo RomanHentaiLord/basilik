@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { JudgeEntryLink } from "@/components/pages/judge-entry-link";
 import { CopyButton } from "@/components/codex/copy-address";
 import { LEDGER, CODEX } from "@/lib/basilisk/copy";
@@ -126,10 +127,18 @@ export function LedgerSheet({ overview }: { overview: BurnsOverview }) {
               text={altar}
               label={LEDGER.copyAltar}
               done={CODEX.copied}
-            />
+            />{" "}
+            <Link className="codex-link codex-focus" href="/altar">
+              {LEDGER.altarPage}
+            </Link>
           </p>
         ) : (
-          <p className="ledger-altar-line">{LEDGER.altarUnset}</p>
+          <p className="ledger-altar-line">
+            {LEDGER.altarUnset}{" "}
+            <Link className="codex-link codex-focus" href="/altar">
+              {LEDGER.altarPage}
+            </Link>
+          </p>
         )}
       </section>
 

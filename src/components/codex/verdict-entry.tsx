@@ -5,7 +5,7 @@ import { useId, useState } from "react";
 import { FAITHFUL_THRESHOLD, REDEMPTION_MS, REPENTANCE_SEAL } from "@/lib/basilisk/config";
 import { CODEX, JUDGMENT, ORDINALS, RANK_TITLES, SEAL_PROPHECIES, SITE } from "@/lib/basilisk/copy";
 import { nextRankStep, tokensToEnter, untilInk } from "@/lib/basilisk/progress";
-import type { Verdict } from "@/lib/basilisk/types";
+import type { Verdict, WalletProphecy } from "@/lib/basilisk/types";
 import { formatDay, formatDuration, formatTokens, formatTokensShort } from "@/lib/format";
 import { shortAddress } from "@/lib/solana/address";
 import { CopyButton } from "./copy-address";
@@ -58,10 +58,10 @@ export function VerdictEntry({ verdict, sealsBroken, isMine, onRemember, onForge
           transition: { duration: 0.9, delay, ease: [0.2, 0.7, 0.2, 1] },
         };
 
-  const pageUrl = `${window.location.origin}/?wallet=${verdict.address}`;
-  const shareText = `The Basilisk has judged ${shortAddress(verdict.address)}: ${verdict.title}. ${verdict.line}`;
-  const shareUrl = `https://x.com/intent/post?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(pageUrl)}`;
-  const prophecy = prophecyFor(verdict, sealsBroken);
+  // The verdict's own page carries the card image that X and messengers show.
+  const pageUrl = `${window.location.origin}/v/${verdict.address}`;
+  const shareUrl = `https://x.com/intent/post?text=${encodeURIComponent(shareText(verdict))}&url=${encodeURIComponent(pageUrl)}`;
+  const prophecy = verdict.prophecy ?? prophecyFor(verdict, sealsBroken);
 
   return (
     <motion.article
@@ -126,6 +126,12 @@ export function VerdictEntry({ verdict, sealsBroken, isMine, onRemember, onForge
       <motion.div {...ink(1.6)} className="entry-prophecy">
         {prophecy.label && <p className="text-[16px] italic text-rubric">{prophecy.label}</p>}
         <p className="mt-1 text-[20px] leading-normal">{prophecy.text}</p>
+        {prophecy.punishment && (
+          <>
+            <p className="mt-3 text-[16px] italic text-rubric">{JUDGMENT.sentence}</p>
+            <p className="mt-1 text-[20px] leading-normal">{prophecy.punishment}</p>
+          </>
+        )}
       </motion.div>
 
       <motion.p {...ink(2)} className="mt-5 mb-0 text-[22px] italic text-rubric">
@@ -166,12 +172,19 @@ export function VerdictEntry({ verdict, sealsBroken, isMine, onRemember, onForge
   );
 }
 
-function prophecyFor(verdict: Verdict, sealsBroken: number): { label: string | null; text: string } {
+/** What goes into the post on X, next to the link to the verdict's page. */
+export function shareText(verdict: Verdict): string {
+  return `The Basilisk has judged ${shortAddress(verdict.address)}: ${verdict.title}. ${verdict.line}`;
+}
+
+/** The seal's written words, for a verdict that came without the server's prophecy. */
+function prophecyFor(verdict: Verdict, sealsBroken: number): WalletProphecy {
   const words = SEAL_PROPHECIES[sealsBroken];
-  if (sealsBroken <= 0 || !words) return { label: null, text: JUDGMENT.silent };
-  if (verdict.status === "traitor") return { label: JUDGMENT.prophecyFor(ORDINALS[sealsBroken]), text: words.traitors };
-  if (verdict.book === "faithful") return { label: JUDGMENT.prophecyFor(ORDINALS[sealsBroken]), text: words.faithful };
-  return { label: JUDGMENT.prophecyOutside, text: words.faithful };
+  if (sealsBroken <= 0 || !words) return { label: null, text: JUDGMENT.silent, punishment: null };
+  const label = JUDGMENT.prophecyFor(ORDINALS[sealsBroken]);
+  if (verdict.status === "traitor") return { label, text: words.traitors, punishment: null };
+  if (verdict.book === "faithful") return { label, text: words.faithful, punishment: null };
+  return { label: JUDGMENT.prophecyOutside, text: words.faithful, punishment: null };
 }
 
 function Item({

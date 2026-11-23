@@ -1,0 +1,1 @@
+ALTER TABLE "prophecies" ADD COLUMN "status" text;

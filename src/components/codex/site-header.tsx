@@ -4,7 +4,8 @@ import { Emblem } from "./ornaments";
 import { Ribbon } from "./ribbon";
 import { WhoAmI } from "./you";
 
-export type SitePage = "book" | "lore" | "burns";
+/** The page being shown; the verdict and Altar pages are not in the menu. */
+export type SitePage = "book" | "lore" | "burns" | "verdict" | "altar";
 
 const LINKS: { page: SitePage; href: string; label: string }[] = [
   { page: "lore", href: "/lore", label: NAV.lore },

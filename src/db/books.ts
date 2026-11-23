@@ -82,6 +82,8 @@ export interface TraitorRow {
   address: string;
   amount: number | null;
   punishment: string;
+  /** Which punishment (eternal-captcha…), for the named punishment from the fourth seal. */
+  flavor: string;
   at: number | null;
 }
 
@@ -281,6 +283,7 @@ export async function booksFromDb(db: AnyDb): Promise<BooksOverview> {
     .select({
       address: wallets.address,
       title: wallets.title,
+      flavor: wallets.flavor,
       amount: wallets.betrayalAmount,
       at: wallets.traitorAt,
     })
@@ -313,6 +316,7 @@ export async function booksFromDb(db: AnyDb): Promise<BooksOverview> {
       address: row.address,
       amount: row.amount,
       punishment: row.title,
+      flavor: row.flavor,
       at: toMs(row.at),
     })),
     firstWitnesses: { taken: Math.min(FIRST_WITNESS_COUNT, counts?.entered ?? 0), names: first },
@@ -333,6 +337,45 @@ export async function recentTraitors(db: AnyDb, limit = 8): Promise<FeedItem[]> 
     .orderBy(desc(wallets.traitorAt))
     .limit(limit);
   return rows.map((row) => ({ address: row.address, title: row.title, amount: row.amount, at: row.at?.getTime() ?? 0 }));
+}
+
+/**
+ * A wallet as the Books keep it: its balance and every event the site has seen.
+ * Judging this again gives the same verdict as the chain, without asking the chain.
+ */
+export async function storedWallet(
+  db: AnyDb,
+  address: string,
+): Promise<{ balance: number; events: WalletEvent[]; judgedAt: number | null } | null> {
+  const [row] = await db
+    .select({ balance: wallets.balance, judgedAt: wallets.lastJudgedAt })
+    .from(wallets)
+    .where(eq(wallets.address, address));
+  if (!row) return null;
+  const events = (await loadEvents(db, [address])).get(address) ?? [];
+  return { balance: row.balance, events, judgedAt: row.judgedAt?.getTime() ?? null };
+}
+
+/** The Altar's offerings: the newest one, and the highest seal any of them answered. */
+export async function altarOfferings(
+  db: AnyDb,
+  altar: string,
+): Promise<{ answered: number; last: { signature: string; amount: number; at: number } | null; count: number }> {
+  const [summary] = await db
+    .select({ answered: sql<number>`coalesce(max(${burns.seal}), 0)`.mapWith(Number), count: count() })
+    .from(burns)
+    .where(eq(burns.burner, altar));
+  const [last] = await db
+    .select({ signature: burns.signature, amount: burns.amount, at: burns.at })
+    .from(burns)
+    .where(eq(burns.burner, altar))
+    .orderBy(desc(burns.at))
+    .limit(1);
+  return {
+    answered: summary?.answered ?? 0,
+    count: Number(summary?.count ?? 0),
+    last: last ? { signature: last.signature, amount: last.amount, at: last.at.getTime() } : null,
+  };
 }
 
 export async function readState<T>(db: AnyDb, key: string): Promise<T | null> {
@@ -481,7 +524,13 @@ export async function richestFaithful(db: AnyDb, limit: number, exclude: string[
 /** The traitors who sold the most in their betrayal. */
 export async function worstTraitors(db: AnyDb, limit: number, exclude: string[] = []): Promise<TraitorRow[]> {
   const rows = await db
-    .select({ address: wallets.address, title: wallets.title, amount: wallets.betrayalAmount, at: wallets.traitorAt })
+    .select({
+      address: wallets.address,
+      title: wallets.title,
+      flavor: wallets.flavor,
+      amount: wallets.betrayalAmount,
+      at: wallets.traitorAt,
+    })
     .from(wallets)
     .where(
       and(
@@ -492,7 +541,13 @@ export async function worstTraitors(db: AnyDb, limit: number, exclude: string[] 
     )
     .orderBy(desc(wallets.betrayalAmount))
     .limit(limit);
-  return rows.map((row) => ({ address: row.address, amount: row.amount, punishment: row.title, at: toMs(row.at) }));
+  return rows.map((row) => ({
+    address: row.address,
+    amount: row.amount,
+    punishment: row.title,
+    flavor: row.flavor,
+    at: toMs(row.at),
+  }));
 }
 
 /** Wallets in the Books whose verdict is the oldest: time alone can change them (tenure, repentance). */

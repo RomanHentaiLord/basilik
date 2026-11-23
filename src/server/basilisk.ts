@@ -8,18 +8,20 @@ import {
   savedReading,
   saveEventRows,
   saveVerdicts,
+  storedWallet,
   type MarketMemory,
 } from "@/db/books";
-import { db } from "@/db";
+import { db, type Db } from "@/db";
 import { FIRST_WITNESS_COUNT } from "@/lib/basilisk/config";
 import { demoHistory } from "@/lib/basilisk/demo";
 import { fnv1a } from "@/lib/basilisk/flavor";
 import { judge } from "@/lib/basilisk/judge";
 import { countBrokenSeals, nextSeal, SEALS, type MarketState } from "@/lib/basilisk/seals";
-import type { Verdict } from "@/lib/basilisk/types";
+import type { Verdict, WalletEvent } from "@/lib/basilisk/types";
 import { getWalletHistory } from "@/lib/solana/history";
 import { DEMO_MARKET, getMarketState, type MarketSource } from "@/lib/solana/market";
 import { tokenMint } from "./env";
+import { readVoice, walletProphecy } from "./voice";
 
 export { tokenMint };
 
@@ -87,6 +89,7 @@ export async function sealsOverview() {
 
   const market = await marketState();
   const broken = countBrokenSeals(market);
+  const voice = await readVoice(broken, market);
   return {
     demo: market.demo,
     mcapUsd: market.mcapUsd,
@@ -97,7 +100,17 @@ export async function sealsOverview() {
     graduated: market.graduated,
     broken,
     next: nextSeal(market),
-    seals: SEALS.map((seal) => ({ ...seal, broken: seal.number <= broken })),
+    seals: SEALS.map((seal) => ({
+      ...seal,
+      broken: seal.number <= broken,
+      /** What it said when this seal broke. */
+      words: voice.words[seal.number] ?? null,
+      brokenAt: voice.brokenAt[seal.number] ?? null,
+    })),
+    /** Grim when the curve fell back or more wallets went red than into ink. */
+    mood: voice.mood,
+    /** Today's psalm, from the first seal. */
+    psalm: voice.psalm,
   };
 }
 
@@ -117,28 +130,58 @@ export async function judgeWallet(address: string): Promise<Verdict> {
   const mint = tokenMint();
 
   if (!mint) {
-    const verdict = judge(demoHistory(address, now), {
-      now,
-      sealsBroken: countBrokenSeals(DEMO_MARKET),
-      demo: true,
-    });
-    return withDemoEntry(verdict);
+    const seals = await sealsOverview();
+    const verdict = withDemoEntry(judge(demoHistory(address, now), { now, sealsBroken: seals.broken, demo: true }));
+    return { ...verdict, prophecy: await walletProphecy(verdict, wordsOf(seals)) };
   }
 
   const [history, seals] = await Promise.all([getWalletHistory(address, mint), sealsOverview()]);
-  const verdict = judge(history, { now, sealsBroken: seals.broken });
-  if (!db) return verdict;
+  const judged = judge(history, { now, sealsBroken: seals.broken });
+  const verdict = db ? await writeIntoBooks(db, judged, history.events) : judged;
+  return { ...verdict, prophecy: await walletProphecy(verdict, wordsOf(seals)) };
+}
 
+/** A stored judgment this fresh is shown on the verdict's page without asking the chain. */
+const REMEMBERED_MS = 24 * 60 * 60_000;
+
+/**
+ * A wallet's verdict from what the Books already hold, without asking the chain: for the
+ * verdict's own page and its card image, which crawlers fetch. Only wallets a visitor judged
+ * in the last day qualify (their whole history is stored, the indexer adds what came after);
+ * null for the rest, which are judged from the chain again.
+ */
+export async function rememberedVerdict(address: string): Promise<Verdict | null> {
+  if (!tokenMint() || !db) return null;
+  const now = Date.now();
+  const stored = await storedWallet(db, address);
+  if (!stored || stored.judgedAt === null || now - stored.judgedAt > REMEMBERED_MS) return null;
+  const seals = await sealsOverview();
+  const verdict = judge({ address, balance: stored.balance, events: stored.events }, { now, sealsBroken: seals.broken });
+  const entry = verdict.firstFaithfulAt === null ? null : await entryOf(db, address);
+  const placed = { ...verdict, entryNumber: entry?.number ?? null, firstWitness: entry?.firstWitness ?? false };
+  return { ...placed, prophecy: await walletProphecy(placed, wordsOf(seals)) };
+}
+
+/** The seal words in the shape walletProphecy() reads. */
+function wordsOf(seals: Awaited<ReturnType<typeof sealsOverview>>) {
+  const words: Record<number, { faithful: string; traitors: string }> = {};
+  for (const seal of seals.seals) if (seal.words) words[seal.number] = seal.words;
+  return { broken: seals.broken, mood: seals.mood, words };
+}
+
+/** Writes the verdict and its events into the Books; returns it with its place in the Book. */
+async function writeIntoBooks(database: Db, verdict: Verdict, events: WalletEvent[]): Promise<Verdict> {
+  const address = verdict.address;
   try {
-    await saveEventRows(db, history.events.map((event) => ({ address, event })));
-    await saveVerdicts(db, [verdict], "judge");
+    await saveEventRows(database, events.map((event) => ({ address, event })));
+    await saveVerdicts(database, [verdict], "judge");
     try {
       // The Books on the page pick the new entry up on the next visits.
       revalidateTag("books", "max");
     } catch {
       // Not inside a request: the Books refresh on their own within a minute.
     }
-    const entry = verdict.firstFaithfulAt === null ? null : await entryOf(db, address);
+    const entry = verdict.firstFaithfulAt === null ? null : await entryOf(database, address);
     return { ...verdict, entryNumber: entry?.number ?? null, firstWitness: entry?.firstWitness ?? false };
   } catch (error) {
     console.error("[judge] could not write the verdict into the Books", error);

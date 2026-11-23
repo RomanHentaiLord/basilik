@@ -16,6 +16,10 @@ export interface SealView {
   mark: number;
   broken: boolean;
   isNext: boolean;
+  /** What it said when the seal broke. */
+  words: { faithful: string; traitors: string } | null;
+  /** "Broken on Nov 24, 14:05 UTC", when the indexer saw it break. */
+  brokenOn: string | null;
 }
 
 /** Hand-drawn cracks, one per seal, so no two broken seals look the same. */
@@ -115,8 +119,12 @@ export function SealReading({
   const reduce = useReducedMotion();
   const current = useSelectedSeal(fallback);
   const seal = seals.find((item) => item.number === current) ?? seals[0];
-  const prophecy = SEAL_PROPHECIES[seal.number];
-  const state = seal.broken ? BOOK.sealBroken : seal.isNext ? `${BOOK.sealNext}, ${seal.when}` : `${BOOK.sealWhole}. Breaks ${seal.when}`;
+  const prophecy = seal.words ?? SEAL_PROPHECIES[seal.number];
+  const state = seal.broken
+    ? (seal.brokenOn ?? BOOK.sealBroken)
+    : seal.isNext
+      ? `${BOOK.sealNext}, ${seal.when}`
+      : `${BOOK.sealWhole}. Breaks ${seal.when}`;
 
   return (
     <AnimatePresence mode="wait" initial={false}>

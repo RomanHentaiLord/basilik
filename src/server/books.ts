@@ -71,6 +71,7 @@ async function demoBooks(): Promise<BooksOverview> {
       address: verdict.address,
       amount: verdict.betrayalAmount,
       punishment: verdict.title,
+      flavor: verdict.flavor,
       at: verdict.traitorAt,
     }));
 

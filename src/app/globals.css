@@ -1306,6 +1306,14 @@ body::before {
   .count--red strong {
     color: var(--rubric);
   }
+  .sentence-words {
+    margin: 0;
+    font-size: 0.95em;
+    font-style: italic;
+    line-height: 1.35;
+    color: var(--rubric);
+    text-wrap: pretty;
+  }
   .entries-title {
     margin: 0.9em 0 0.25em;
     font-size: 0.86em;
@@ -1554,6 +1562,26 @@ body::before {
     max-width: 34em;
     font-size: 1.35rem;
     line-height: 1.5;
+  }
+
+  /* The psalm of the day: a verse set off like an epigraph, red rule on the left. */
+  .psalm {
+    margin: -0.4rem 0 2rem;
+    padding: 0.15rem 0 0.15rem 1rem;
+    max-width: 34em;
+    border-left: 0.2em double var(--rubric);
+  }
+  .psalm figcaption {
+    font-size: 1rem;
+    font-style: italic;
+    color: var(--rubric);
+  }
+  .psalm blockquote {
+    margin: 0.15rem 0 0;
+    font-size: 1.45rem;
+    font-style: italic;
+    line-height: 1.4;
+    text-wrap: pretty;
   }
 
   .codex-input {
@@ -1904,6 +1932,168 @@ body::before {
     width: min(100%, 62rem);
     padding: 4.2rem 4.4rem 3.6rem;
   }
+
+  /* The Altar: what it holds, what it owes, and the burn. */
+  .altar-sheet {
+    width: min(100%, 50rem);
+    padding: 4rem 4.2rem 3.4rem;
+    font-size: 1.25rem;
+  }
+  .altar-facts {
+    margin: 0 0 2rem;
+  }
+  .altar-facts p {
+    margin: 0.3rem 0;
+    line-height: 1.45;
+  }
+  .altar-term,
+  .altar-note {
+    font-style: italic;
+    color: var(--ink-muted);
+  }
+  .altar-note {
+    margin: 0 0 1.2rem;
+  }
+  .altar-note--wrong {
+    color: var(--rubric);
+  }
+  .altar-seals {
+    margin: 0 0 2.2rem;
+  }
+  .altar-seals ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .altar-seals li {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.1rem 1rem;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid rgba(42, 30, 20, 0.18);
+  }
+  .altar-seal-state small {
+    font-size: 0.85em;
+    color: var(--ink-muted);
+  }
+  .altar-seals li.owed .altar-seal-state {
+    color: var(--rubric);
+    font-weight: 600;
+  }
+  .altar-seals li.owed .altar-seal-state small {
+    font-weight: 400;
+  }
+  .altar-rite ol {
+    margin: 0.4rem 0 1.4rem;
+    padding-left: 1.3em;
+    list-style: decimal outside;
+  }
+  .altar-rite li::marker {
+    color: var(--rubric);
+    font-style: italic;
+  }
+  .altar-rite li {
+    margin: 0.3rem 0;
+    padding-left: 0.2em;
+    line-height: 1.45;
+  }
+  .altar-ritual {
+    margin: 0 0 1.4rem;
+    padding: 1.2rem 1.3rem;
+    border: 1px solid rgba(168, 36, 27, 0.45);
+    background: rgba(255, 248, 228, 0.35);
+  }
+  .altar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.8rem 1.4rem;
+  }
+  /* The one loud thing on the page: an ember, not a flat red. */
+  .altar-button {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+    background: linear-gradient(180deg, #c0391f, var(--rubric-dark));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 214, 170, 0.3),
+      0 2px 0 #5e120d,
+      0 0 0.9rem rgba(192, 57, 31, 0.28);
+  }
+  .altar-button:hover {
+    background: linear-gradient(180deg, #a8301a, #5e120d);
+  }
+  .altar-cancel {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    cursor: pointer;
+  }
+  .altar-confirm p {
+    margin: 0 0 0.9rem;
+    font-size: 1.1em;
+  }
+  .altar-done-title {
+    margin: 0;
+    font-family: var(--font-fraktur), serif;
+    font-size: 2.1rem;
+    color: var(--rubric);
+  }
+  .altar-done p {
+    margin: 0.3rem 0 0;
+  }
+  .altar-error {
+    margin: 0.8rem 0 0;
+    font-style: italic;
+    color: var(--rubric);
+  }
+  .altar-ledger {
+    margin: 0;
+  }
+
+  /* A verdict on its own page, opened from a shared link. */
+  .verdict-sheet {
+    width: min(100%, 46rem);
+    padding: 4rem 4.2rem 3.4rem;
+    font-size: 1.3rem;
+  }
+  .verdict-title {
+    margin-top: 0.15em;
+    text-wrap: balance;
+  }
+  .verdict-sheet--traitor .verdict-title {
+    color: var(--rubric);
+  }
+  .verdict-sheet--doubter .verdict-title {
+    color: var(--pencil);
+  }
+  .verdict-book {
+    margin: 0.5rem 0 1.2rem;
+    font-style: italic;
+    color: var(--ink-muted);
+  }
+  .verdict-fate {
+    margin: 0 0 1rem;
+    font-size: 1.15em;
+    line-height: 1.45;
+  }
+  .verdict-prophecy {
+    margin: 1.2rem 0;
+  }
+  .verdict-line {
+    margin: 1.2rem 0 1.6rem;
+    font-size: 1.15em;
+    font-style: italic;
+    color: var(--rubric);
+  }
+  .verdict-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem 1.8rem;
+    margin: 0;
+  }
   .ledger-lede {
     margin-bottom: 1.4rem;
   }
@@ -2127,6 +2317,14 @@ body::before {
     .lore-sheet,
     .ledger-sheet {
       padding: 2.8rem 1.35rem 2.4rem;
+    }
+    .verdict-sheet,
+    .altar-sheet {
+      padding: 2.8rem 1.5rem 2.2rem;
+      font-size: 1.15rem;
+    }
+    .altar-ritual {
+      padding: 1rem;
     }
     .lore-chapter {
       grid-template-columns: minmax(0, 1fr);

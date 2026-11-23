@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { BOOK, CODEX } from "@/lib/basilisk/copy";
 import { SEALS, sealMark, type Seal } from "@/lib/basilisk/seals";
-import { formatUsd } from "@/lib/format";
+import { formatMoment, formatUsd } from "@/lib/format";
 import type { sealsOverview } from "@/server/basilisk";
 import { Page } from "./pages";
 import { SealReading, SealsGrid, type SealView } from "./seal-reader";
@@ -25,6 +25,8 @@ function views(overview: SealsOverview): SealView[] {
     mark: sealMark(seal),
     broken: seal.broken,
     isNext: seal.number === next,
+    words: seal.words,
+    brokenOn: seal.brokenAt === null ? null : `${BOOK.sealBrokenOn} ${formatMoment(seal.brokenAt)}`,
   }));
 }
 

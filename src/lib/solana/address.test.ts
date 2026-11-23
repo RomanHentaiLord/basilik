@@ -35,3 +35,14 @@ describe("isSolanaAddress", () => {
     expect(isSolanaAddress("hello")).toBe(false);
   });
 });
+
+describe("encodeBase58", () => {
+  it("is the inverse of decodeBase58", async () => {
+    const { decodeBase58, encodeBase58 } = await import("./address");
+    for (const value of ["7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU", "11111111111111111111111111111111", "1112", "z"]) {
+      const bytes = decodeBase58(value);
+      expect(bytes).not.toBeNull();
+      expect(encodeBase58(bytes as Uint8Array)).toBe(value);
+    }
+  });
+});

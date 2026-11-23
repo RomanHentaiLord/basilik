@@ -31,6 +31,30 @@ export function decodeBase58(value: string): Uint8Array | null {
   return out;
 }
 
+/** Encodes bytes as base58: a transaction signature as explorers show it. */
+export function encodeBase58(bytes: Uint8Array): string {
+  const digits: number[] = []; // little-endian base-58 digits
+  for (const byte of bytes) {
+    let carry = byte;
+    for (let i = 0; i < digits.length; i++) {
+      carry += digits[i] << 8;
+      digits[i] = carry % 58;
+      carry = (carry / 58) | 0;
+    }
+    while (carry > 0) {
+      digits.push(carry % 58);
+      carry = (carry / 58) | 0;
+    }
+  }
+  let out = "";
+  for (const byte of bytes) {
+    if (byte !== 0) break;
+    out += "1";
+  }
+  for (let i = digits.length - 1; i >= 0; i--) out += ALPHABET[digits[i]];
+  return out;
+}
+
 /** True for any base58 string that decodes to a 32-byte Solana public key. */
 export function isSolanaAddress(value: string): boolean {
   const trimmed = value.trim();
