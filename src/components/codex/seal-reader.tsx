@@ -3,7 +3,6 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useSyncExternalStore, type CSSProperties } from "react";
 import { BOOK, SEAL_PROPHECIES } from "@/lib/basilisk/copy";
-import { formatUsd } from "@/lib/format";
 
 /** A seal as the pages show it, prepared on the server. */
 export interface SealView {
@@ -11,10 +10,10 @@ export interface SealView {
   roman: string;
   label: string;
   unlock: string;
-  /** "at $500K" or "when the coin leaves the bonding curve". */
+  /** "at 40% of the bonding curve" or "at the bond". */
   when: string;
-  /** Market cap that breaks it, or null for the bonding-curve seal. */
-  usd: number | null;
+  /** Share of the bonding curve that breaks it (1 for the bond). */
+  mark: number;
   broken: boolean;
   isNext: boolean;
 }
@@ -106,12 +105,12 @@ export function SealsGrid({ seals, fallback }: { seals: SealView[]; fallback: nu
 export function SealReading({
   seals,
   fallback,
-  mcapUsd,
+  curve,
 }: {
   seals: SealView[];
   fallback: number;
-  /** Null when no market source answered. */
-  mcapUsd: number | null;
+  /** Share of the bonding curve sold now; null when the chain did not say. */
+  curve: number | null;
 }) {
   const reduce = useReducedMotion();
   const current = useSelectedSeal(fallback);
@@ -151,16 +150,17 @@ export function SealReading({
             <p className="page-text" style={{ fontStyle: "italic", color: "var(--ink-muted)" }}>
               {BOOK.sealUnder}
             </p>
-            {seal.usd !== null && mcapUsd !== null && (
+            {curve !== null && (
               <div className="mcap" style={{ marginTop: "1.4em" }}>
                 <div className="mcap-row">
-                  <span>{BOOK.mcapNow}</span>
+                  <span>{BOOK.curveNow}</span>
                   <strong>
-                    {formatUsd(mcapUsd)} <span style={{ fontSize: "0.7em", fontWeight: 400 }}>of {formatUsd(seal.usd)}</span>
+                    {Math.round(curve * 100)}%{" "}
+                    <span style={{ fontSize: "0.7em", fontWeight: 400 }}>of {Math.round(seal.mark * 100)}%</span>
                   </strong>
                 </div>
                 <div className="ink-bar" aria-hidden="true">
-                  <span style={{ "--p": `${Math.min(100, Math.round((mcapUsd / seal.usd) * 100))}%` } as CSSProperties} />
+                  <span style={{ "--p": `${Math.min(100, Math.round((curve / seal.mark) * 100))}%` } as CSSProperties} />
                 </div>
               </div>
             )}

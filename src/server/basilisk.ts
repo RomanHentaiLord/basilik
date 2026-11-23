@@ -38,7 +38,7 @@ export async function marketState(): Promise<MarketState & { demo: boolean; sour
   const unconfirmed = async () => {
     // Without the saved memory nothing can be confirmed: the reading stands on its own.
     const live = await getMarketState(mint);
-    return { ...live, athMcapUsd: live.mcapUsd, demo: false };
+    return { ...live, athMcapUsd: live.mcapUsd, curveHigh: live.curve, demo: false };
   };
   if (!db) return unconfirmed();
 
@@ -57,6 +57,8 @@ export async function marketState(): Promise<MarketState & { demo: boolean; sour
     return {
       mcapUsd: fresh.mcapUsd,
       graduated: Boolean(memory?.graduated),
+      curve: memory?.lastCurve,
+      curveHigh: memory?.curveHigh,
       athMcapUsd: memory?.usd ?? 0,
       source: fresh.source as MarketSource,
       demo: false,
@@ -69,6 +71,8 @@ export async function marketState(): Promise<MarketState & { demo: boolean; sour
   return {
     mcapUsd: fallback?.mcapUsd ?? live.mcapUsd,
     graduated: merged.graduated,
+    curve: live.curve ?? memory?.lastCurve,
+    curveHigh: merged.curveHigh,
     athMcapUsd: merged.usd,
     source: (fallback?.source as MarketSource | undefined) ?? live.source,
     demo: false,
@@ -88,6 +92,9 @@ export async function sealsOverview() {
     mcapUsd: market.mcapUsd,
     /** Where the market cap came from; "none" when every source failed. */
     source: market.source,
+    /** Share of the bonding curve sold now (0–1), or null when the chain did not say. */
+    curve: market.graduated ? 1 : (market.curve ?? null),
+    graduated: market.graduated,
     broken,
     next: nextSeal(market),
     seals: SEALS.map((seal) => ({ ...seal, broken: seal.number <= broken })),

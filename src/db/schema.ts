@@ -98,11 +98,22 @@ export const prophecies = pgTable(
   (table) => [primaryKey({ columns: [table.address, table.seal] })],
 );
 
-/** Buybacks and burns from the altar (the creator-fee wallet). */
-export const burns = pgTable("burns", {
-  id: serial("id").primaryKey(),
-  signature: text("signature").notNull().unique(),
-  amount: doublePrecision("amount").notNull(),
-  seal: integer("seal"),
-  at: timestamp("at", { withTimezone: true }).notNull(),
-});
+/**
+ * Every burn of the coin, one row per transaction: the Altar's offerings (fees spent on a
+ * buyback, then burned) and any holder who burns their own tokens.
+ */
+export const burns = pgTable(
+  "burns",
+  {
+    id: serial("id").primaryKey(),
+    signature: text("signature").notNull().unique(),
+    /** Tokens burned, in UI units. */
+    amount: doublePrecision("amount").notNull(),
+    /** The wallet that burned them. */
+    burner: text("burner"),
+    /** Seals broken when the burn happened. */
+    seal: integer("seal"),
+    at: timestamp("at", { withTimezone: true }).notNull(),
+  },
+  (table) => [index("burns_at_idx").on(table.at), index("burns_burner_idx").on(table.burner)],
+);

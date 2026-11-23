@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DAY_MS } from "./config";
+import { DAY_MS, HOUR_MS } from "./config";
 import { demoHistory, demoScenario } from "./demo";
 import { applyTenure, judge, rankByBalance } from "./judge";
 import type { WalletEvent, WalletHistory } from "./types";
@@ -7,6 +7,9 @@ import type { WalletEvent, WalletHistory } from "./types";
 const NOW = Date.UTC(2026, 10, 21, 12, 0, 0);
 const ADDRESS = "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU";
 const daysAgo = (n: number) => NOW - n * DAY_MS;
+const HOUR_IN_DAYS = HOUR_MS / DAY_MS;
+/** Ten minutes ago: too soon for any tenure mark, so the rank comes from the balance alone. */
+const JUST_NOW = HOUR_IN_DAYS / 6;
 
 /** Build a history from [kind, amount, daysAgo] steps; balanceAfter is computed. */
 function history(steps: [WalletEvent["kind"], number, number][]): WalletHistory {
@@ -39,7 +42,7 @@ describe("chain of checks", () => {
     expect(v.status).toBe("sympathizer");
   });
 
-  it("3 — traitor who bought back and held 7 days is forgiven, with a scar", () => {
+  it("3 — traitor who bought back and held a day is forgiven, with a scar", () => {
     const v = run(history([["buy", 800_000, 40], ["sell", 800_000, 30], ["buy", 300_000, 20]]));
     expect(v.status).toBe("forgiven");
     expect(v.book).toBe("faithful");
@@ -49,13 +52,13 @@ describe("chain of checks", () => {
   it("3 — forgiveness waits for the third seal", () => {
     const v = run(history([["buy", 800_000, 40], ["sell", 800_000, 30], ["buy", 300_000, 20]]), 2);
     expect(v.status).toBe("traitor");
-    expect(v.redemptionDaysLeft).toBe(0);
+    expect(v.redemptionMsLeft).toBe(0);
   });
 
-  it("3 — repenting traitor sees the days left", () => {
-    const v = run(history([["buy", 800_000, 40], ["sell", 800_000, 30], ["buy", 300_000, 3]]));
+  it("3 — repenting traitor sees the time left", () => {
+    const v = run(history([["buy", 800_000, 40], ["sell", 800_000, 30], ["buy", 300_000, 6 * HOUR_IN_DAYS]]));
     expect(v.status).toBe("traitor");
-    expect(v.redemptionDaysLeft).toBe(4);
+    expect(v.redemptionMsLeft).toBe(18 * HOUR_MS);
   });
 
   it("3 — selling during repentance restarts the clock", () => {
@@ -63,12 +66,12 @@ describe("chain of checks", () => {
       history([
         ["buy", 800_000, 40],
         ["sell", 800_000, 30],
-        ["buy", 300_000, 20],
-        ["sell", 10_000, 15],
+        ["buy", 300_000, 10 * HOUR_IN_DAYS],
+        ["sell", 10_000, 5 * HOUR_IN_DAYS],
       ]),
     );
     expect(v.status).toBe("traitor");
-    expect(v.redemptionDaysLeft).toBeNull();
+    expect(v.redemptionMsLeft).toBeNull();
   });
 
   it("4 — falling below the threshold by selling is betrayal", () => {
@@ -116,59 +119,64 @@ describe("chain of checks", () => {
     expect(v.traitorAt).toBeNull();
   });
 
-  it("5 — a recent small sell writes the wallet in pencil", () => {
-    const v = run(history([["buy", 900_000, 25], ["sell", 200_000, 2]]));
+  it("5 — a small sell within the hour writes the wallet in pencil", () => {
+    const v = run(history([["buy", 900_000, 25], ["sell", 200_000, 0.5 * HOUR_IN_DAYS]]));
     expect(v.status).toBe("doubter");
     expect(v.book).toBe("faithful");
     expect(v.title.startsWith("Doubting")).toBe(true);
   });
 
-  it("5 — after seven quiet days the pencil turns to ink", () => {
-    const v = run(history([["buy", 900_000, 25], ["sell", 200_000, 8]]));
+  it("5 — after a quiet hour the pencil turns to ink", () => {
+    const v = run(history([["buy", 900_000, 25], ["sell", 200_000, 2 * HOUR_IN_DAYS]]));
     expect(v.status).toBe("faithful");
   });
 
   it("6 — rank by balance, eleven steps from 20,000", () => {
-    expect(run(history([["buy", 20_000, 3]])).rank).toBe("pet");
-    expect(run(history([["buy", 60_000, 3]])).rank).toBe("acolyte");
-    expect(run(history([["buy", 150_000, 3]])).rank).toBe("scribe");
-    expect(run(history([["buy", 350_000, 3]])).rank).toBe("lamplighter");
-    expect(run(history([["buy", 700_000, 3]])).rank).toBe("keeper");
-    expect(run(history([["buy", 1_200_000, 3]])).rank).toBe("warden");
-    expect(run(history([["buy", 2_400_000, 3]])).rank).toBe("herald");
-    expect(run(history([["buy", 6_200_000, 3]])).rank).toBe("priest");
-    expect(run(history([["buy", 14_000_000, 3]])).rank).toBe("archon");
-    expect(run(history([["buy", 25_000_000, 3]])).rank).toBe("apostle");
-    expect(run(history([["buy", 60_000_000, 3]])).rank).toBe("hand");
+    expect(run(history([["buy", 20_000, JUST_NOW]])).rank).toBe("pet");
+    expect(run(history([["buy", 60_000, JUST_NOW]])).rank).toBe("acolyte");
+    expect(run(history([["buy", 150_000, JUST_NOW]])).rank).toBe("scribe");
+    expect(run(history([["buy", 350_000, JUST_NOW]])).rank).toBe("lamplighter");
+    expect(run(history([["buy", 700_000, JUST_NOW]])).rank).toBe("keeper");
+    expect(run(history([["buy", 1_200_000, JUST_NOW]])).rank).toBe("warden");
+    expect(run(history([["buy", 2_400_000, JUST_NOW]])).rank).toBe("herald");
+    expect(run(history([["buy", 6_200_000, JUST_NOW]])).rank).toBe("priest");
+    expect(run(history([["buy", 14_000_000, JUST_NOW]])).rank).toBe("archon");
+    expect(run(history([["buy", 25_000_000, JUST_NOW]])).rank).toBe("apostle");
+    expect(run(history([["buy", 60_000_000, JUST_NOW]])).rank).toBe("hand");
   });
 
   it("6 — pets get a species from the address, always the same one", () => {
-    const a = run(history([["buy", 30_000, 3]]));
-    const b = run(history([["buy", 30_000, 3]]));
+    const a = run(history([["buy", 30_000, JUST_NOW]]));
+    const b = run(history([["buy", 30_000, JUST_NOW]]));
     expect(a.title).toMatch(/ of the Basilisk$/);
     expect(a.title).toBe(b.title);
   });
 });
 
 describe("tenure", () => {
-  it("lifts one step per 30 days without selling", () => {
-    expect(run(history([["buy", 30_000, 31]])).rank).toBe("acolyte");
-    expect(run(history([["buy", 30_000, 61]])).rank).toBe("scribe");
-    expect(run(history([["buy", 30_000, 91]])).rank).toBe("lamplighter");
+  it("lifts one step at 1 hour, 2 hours, 3 hours, 1 day and 7 days without selling", () => {
+    const heldFor = (days: number) => run(history([["buy", 30_000, days]])).rank;
+    expect(heldFor(0.5 * HOUR_IN_DAYS)).toBe("pet");
+    expect(heldFor(1 * HOUR_IN_DAYS)).toBe("acolyte");
+    expect(heldFor(2 * HOUR_IN_DAYS)).toBe("scribe");
+    expect(heldFor(3 * HOUR_IN_DAYS)).toBe("lamplighter");
+    expect(heldFor(1)).toBe("keeper");
+    expect(heldFor(6.9)).toBe("keeper");
+    expect(heldFor(7)).toBe("warden");
   });
 
-  it("lifts three ranks at most", () => {
-    expect(run(history([["buy", 30_000, 400]])).rank).toBe("lamplighter");
-    expect(applyTenure("pet", 1000)).toBe("lamplighter");
+  it("lifts five ranks at most", () => {
+    expect(run(history([["buy", 30_000, 400]])).rank).toBe("warden");
+    expect(applyTenure("pet", 400 * DAY_MS)).toBe("warden");
   });
 
   it("never lifts above priest", () => {
     expect(run(history([["buy", 2_400_000, 400]])).rank).toBe("priest");
-    expect(applyTenure("herald", 1000)).toBe("priest");
+    expect(applyTenure("herald", 400 * DAY_MS)).toBe("priest");
   });
 
   it("the ranks above priest come from balance only", () => {
-    expect(applyTenure("archon", 1000)).toBe("archon");
+    expect(applyTenure("archon", 400 * DAY_MS)).toBe("archon");
     expect(rankByBalance(9_999_999)).toBe("priest");
     expect(rankByBalance(10_000_000)).toBe("archon");
     expect(rankByBalance(50_000_000)).toBe("hand");
@@ -176,10 +184,16 @@ describe("tenure", () => {
   });
 
   it("a sale restarts the tenure clock", () => {
-    const v = run(history([["buy", 900_000, 90], ["sell", 100_000, 10]]));
+    const v = run(history([["buy", 900_000, 90], ["sell", 100_000, 5 * HOUR_IN_DAYS]]));
     expect(v.status).toBe("faithful");
-    expect(v.tenureDays).toBe(10);
-    expect(v.rank).toBe("keeper");
+    expect(v.tenureMs).toBe(5 * HOUR_MS);
+    // 800,000 is a Keeper by balance; three marks (1, 2 and 3 hours) lift it to Priest, the cap.
+    expect(v.rank).toBe("priest");
+  });
+
+  it("a sale within the hour writes the wallet in pencil", () => {
+    const v = run(history([["buy", 900_000, 90], ["sell", 100_000, 0.5 * HOUR_IN_DAYS]]));
+    expect(v.status).toBe("doubter");
   });
 });
 

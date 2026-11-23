@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isSolanaAddress, shortAddress } from "./address";
-import { parseTransaction, type ParsedTransaction, type TokenBalance } from "./parse";
+import { parseBurns, parseTransaction, type ParsedTransaction, type TokenBalance } from "./parse";
 
 const OWNER = "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU";
 const OTHER = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM";
@@ -139,5 +139,47 @@ describe("addresses", () => {
 
   it("shortens addresses for the Books", () => {
     expect(shortAddress(OWNER)).toBe("7xKX…gAsU");
+  });
+});
+
+describe("parseBurns", () => {
+  const burnTx = (type: "burn" | "burnChecked", info: Record<string, unknown>): ParsedTransaction => ({
+    blockTime: 1_790_000_000,
+    slot: 1,
+    meta: {
+      err: null,
+      fee: 5_000,
+      preBalances: [10_000_000_000],
+      postBalances: [9_999_995_000],
+      preTokenBalances: [balance(1, OWNER, MINT, "100000000000")],
+      postTokenBalances: [balance(1, OWNER, MINT, "40000000000")],
+    },
+    transaction: {
+      signatures: ["burn-sig"],
+      message: { accountKeys: [{ pubkey: OWNER }], instructions: [{ program: "spl-token", parsed: { type, info } }] },
+    },
+  });
+
+  it("reads Burn and BurnChecked of the coin", () => {
+    expect(parseBurns(burnTx("burnChecked", { mint: MINT, authority: OWNER, tokenAmount: { amount: "60000000000", decimals: 6 } }), MINT)).toEqual([
+      { signature: "burn-sig", burner: OWNER, amount: 60_000, at: 1_790_000_000_000 },
+    ]);
+    // Plain Burn has no decimals: they come from the token balances.
+    expect(parseBurns(burnTx("burn", { mint: MINT, authority: OWNER, amount: "60000000000" }), MINT)[0].amount).toBe(60_000);
+  });
+
+  it("ignores other coins and failed transactions", () => {
+    expect(parseBurns(burnTx("burn", { mint: WSOL, authority: OWNER, amount: "5" }), MINT)).toEqual([]);
+    const failed = burnTx("burn", { mint: MINT, authority: OWNER, amount: "5" });
+    failed.meta!.err = { InstructionError: [0, "Custom"] };
+    expect(parseBurns(failed, MINT)).toEqual([]);
+  });
+
+  it("does not count tokens sent to a dead address", () => {
+    const transfer = burnTx("burn", {});
+    transfer.transaction.message.instructions = [
+      { program: "spl-token", parsed: { type: "transferChecked", info: { mint: MINT, destination: "1nc1nerator11111111111111111111111111111111" } } },
+    ];
+    expect(parseBurns(transfer, MINT)).toEqual([]);
   });
 });

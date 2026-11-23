@@ -1,14 +1,12 @@
 import {
-  DAY_MS,
-  DOUBT_WINDOW_DAYS,
+  DOUBT_WINDOW_MS,
   FAITHFUL_THRESHOLD,
   RANKS,
   RANK_FLOORS,
-  REDEMPTION_DAYS,
+  REDEMPTION_MS,
   REPENTANCE_SEAL,
-  TENURE_MAX_STEPS,
   TENURE_RANK_CAP,
-  TENURE_STEP_DAYS,
+  TENURE_STEPS_MS,
   type Rank,
 } from "./config";
 import {
@@ -41,16 +39,20 @@ export function rankByBalance(balance: number): Rank | null {
   return result;
 }
 
+/** How many tenure marks (1 h, 2 h, 3 h, 1 day, 7 days) a holding stretch has passed. */
+export function tenureSteps(tenureMs: number): number {
+  return TENURE_STEPS_MS.filter((mark) => tenureMs >= mark).length;
+}
+
 /**
- * Each full tenure step lifts the rank by one: at most TENURE_MAX_STEPS steps, never above
- * the tenure cap. Ranks above the cap are earned by balance only, and tenure never lowers a rank.
+ * Each tenure mark lifts the rank by one, never above the tenure cap. Ranks above the cap
+ * are earned by balance only, and tenure never lowers a rank.
  */
-export function applyTenure(base: Rank, tenureDays: number): Rank {
+export function applyTenure(base: Rank, tenureMs: number): Rank {
   const baseIndex = RANKS.indexOf(base);
   const capIndex = RANKS.indexOf(TENURE_RANK_CAP);
   if (baseIndex >= capIndex) return base;
-  const steps = Math.min(Math.floor(tenureDays / TENURE_STEP_DAYS), TENURE_MAX_STEPS);
-  return RANKS[Math.min(baseIndex + steps, capIndex)];
+  return RANKS[Math.min(baseIndex + tenureSteps(tenureMs), capIndex)];
 }
 
 function faithfulTitle(rank: Rank, address: string): string {
@@ -72,7 +74,7 @@ export function judge(history: WalletHistory, options: JudgeOptions): Verdict {
   const sinceLastSell =
     ledger.lastSellAt === null ? Infinity : now - ledger.lastSellAt;
   const tenureStart = Math.max(ledger.aboveSince ?? now, ledger.lastSellAt ?? 0);
-  const tenureDays = Math.max(0, Math.floor((now - tenureStart) / DAY_MS));
+  const tenureMs = Math.max(0, now - tenureStart);
   const pet = pick(address, "pet", PET_SPECIES);
   const punishment = pick(address, "punishment", PUNISHMENTS);
 
@@ -87,13 +89,13 @@ export function judge(history: WalletHistory, options: JudgeOptions): Verdict {
     line: LINES.witness,
     balance,
     peak: ledger.peak,
-    tenureDays: balance >= FAITHFUL_THRESHOLD ? tenureDays : 0,
+    tenureMs: balance >= FAITHFUL_THRESHOLD ? tenureMs : 0,
     lastSellAt: ledger.lastSellAt,
     traitorAt: ledger.traitorAt,
     betrayalSignature: ledger.betrayalSignature,
     betrayalAmount: ledger.betrayalAmount,
     scar: false,
-    redemptionDaysLeft: null,
+    redemptionMsLeft: null,
     firstFaithfulAt: ledger.firstFaithfulAt,
     entryNumber: null,
     firstWitness: false,
@@ -133,15 +135,8 @@ export function judge(history: WalletHistory, options: JudgeOptions): Verdict {
 
   // 4. Was faithful, then sold half of the peak or fell below the threshold.
   if (ledger.traitorAt !== null) {
-    const redemptionDaysLeft =
-      ledger.redemptionStart === null
-        ? null
-        : Math.max(
-            0,
-            Math.ceil(
-              (ledger.redemptionStart + REDEMPTION_DAYS * DAY_MS - now) / DAY_MS,
-            ),
-          );
+    const redemptionMsLeft =
+      ledger.redemptionStart === null ? null : Math.max(0, ledger.redemptionStart + REDEMPTION_MS - now);
     return {
       ...base,
       status: "traitor",
@@ -150,7 +145,7 @@ export function judge(history: WalletHistory, options: JudgeOptions): Verdict {
       title: PUNISHMENT_TITLES[punishment],
       fate: PUNISHMENT_FATES[punishment],
       line: LINES.traitor,
-      redemptionDaysLeft,
+      redemptionMsLeft,
     };
   }
 
@@ -168,7 +163,7 @@ export function judge(history: WalletHistory, options: JudgeOptions): Verdict {
   const baseRank = rankByBalance(balance) ?? "pet";
 
   // 5. Faithful, but sold something in the last few days.
-  if (sinceLastSell < DOUBT_WINDOW_DAYS * DAY_MS) {
+  if (sinceLastSell < DOUBT_WINDOW_MS) {
     return {
       ...base,
       status: "doubter",
@@ -181,7 +176,7 @@ export function judge(history: WalletHistory, options: JudgeOptions): Verdict {
   }
 
   // Otherwise: rank by balance, lifted by tenure.
-  const rank = applyTenure(baseRank, tenureDays);
+  const rank = applyTenure(baseRank, tenureMs);
   return {
     ...base,
     status: "faithful",

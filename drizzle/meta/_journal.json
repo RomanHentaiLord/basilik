@@ -15,6 +15,13 @@
       "when": 1795383294947,
       "tag": "0001_stage2_books",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795454422019,
+      "tag": "0002_stage3_burns",
+      "breakpoints": true
     }
   ]
 }

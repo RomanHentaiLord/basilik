@@ -4,6 +4,7 @@ import {
   bondingCurveAddress,
   chain,
   curveMarketCapSol,
+  curveProgress,
   decodeBondingCurve,
   dexScreener,
   forgetSolPrice,
@@ -23,6 +24,7 @@ function curveBytes(fields: { vTok: bigint; vSol: bigint; supply: bigint; comple
   data.set([23, 183, 248, 55, 96, 216, 172, 96]); // discriminator
   view.setBigUint64(8, fields.vTok, true);
   view.setBigUint64(16, fields.vSol, true);
+  // Real tokens for sale: the virtual reserve minus the 279.9M that are never sold on the curve.
   view.setBigUint64(24, fields.vTok - BigInt(279_900_000_000_000), true);
   view.setBigUint64(32, fields.vSol - BigInt(30_000_000_000), true);
   view.setBigUint64(40, fields.supply, true);
@@ -54,6 +56,7 @@ describe("bonding curve", () => {
     expect(curve).toEqual({
       virtualTokenReserves: FRESH.vTok,
       virtualSolReserves: FRESH.vSol,
+      realTokenReserves: BigInt(793_100_000_000_000),
       tokenTotalSupply: FRESH.supply,
       complete: false,
     });
@@ -62,6 +65,15 @@ describe("bonding curve", () => {
 
   it("refuses data too short to be a curve", () => {
     expect(decodeBondingCurve(new Uint8Array(40))).toBeNull();
+  });
+
+  it("measures the share of the curve sold, like pump.fun's progress bar", () => {
+    const fresh = decodeBondingCurve(curveBytes({ ...FRESH, complete: false }))!;
+    expect(curveProgress(fresh)).toBe(0);
+    // Half of the 793.1M tokens for sale are gone.
+    const half = { ...fresh, virtualTokenReserves: FRESH.vTok - BigInt(396_550_000_000_000), realTokenReserves: BigInt(396_550_000_000_000) };
+    expect(curveProgress(half)).toBeCloseTo(0.5);
+    expect(curveProgress({ ...fresh, complete: true })).toBe(1);
   });
 
   it("prices a fresh coin at about 28 SOL, like pump.fun does", () => {
@@ -97,6 +109,7 @@ describe("bonding curve", () => {
     const quote = await chain(MINT);
     expect(seen).toEqual(["getAccountInfo", "getAsset"]);
     expect(quote?.graduated).toBe(false);
+    expect(quote?.curve).toBe(0);
     expect(quote?.mcapUsd).toBeCloseTo(27.96 * 200, 0);
 
     // The SOL price is remembered: the next reading costs one plain RPC call.
@@ -120,7 +133,7 @@ describe("bonding curve", () => {
         return { ok: true, status: 200, json: async () => payload };
       }),
     );
-    expect(await chain(MINT)).toEqual({ graduated: true });
+    expect(await chain(MINT)).toEqual({ graduated: true, curve: 1 });
     expect(seen).toEqual(["getAccountInfo"]);
   });
 });
@@ -162,10 +175,19 @@ describe("getMarketState", () => {
   it("answers from the chain without waiting for a slow price site", async () => {
     const reading = await getMarketState(
       MINT,
-      order(answers({ mcapUsd: 5_000, graduated: false }), never, never, never),
+      order(answers({ mcapUsd: 5_000, graduated: false, curve: 0.12 }), never, never, never),
       60_000,
     );
-    expect(reading).toEqual({ mcapUsd: 5_000, graduated: false, source: "chain" });
+    expect(reading).toEqual({ mcapUsd: 5_000, graduated: false, curve: 0.12, source: "chain" });
+  });
+
+  it("keeps the curve from the chain when the price comes from elsewhere", async () => {
+    const reading = await getMarketState(
+      MINT,
+      order(answers({ graduated: false, curve: 0.4 }), answers({ mcapUsd: 9_000 }), never, never),
+      50,
+    );
+    expect(reading).toEqual({ mcapUsd: 9_000, graduated: false, curve: 0.4, source: "dexscreener" });
   });
 
   it("does not spend Helius credits when the chain or DexScreener has the price", async () => {
@@ -216,14 +238,23 @@ describe("getMarketState", () => {
     vi.stubEnv("MARKET_MCAP_USD", "260000");
     vi.stubEnv("MARKET_GRADUATED", "true");
     const reading = await getMarketState(MINT, order(never, never, never, never), 50);
-    expect(reading).toEqual({ mcapUsd: 260_000, graduated: true, source: "override" });
+    expect(reading).toEqual({ mcapUsd: 260_000, graduated: true, curve: 1, source: "override" });
   });
 });
 
 describe("market memory", () => {
   it("counts a high once two good readings in a row reach it", () => {
     const first = mergeMarketMemory(null, { mcapUsd: 30_000, graduated: false, source: "chain" }, 1_000);
-    expect(first).toEqual({ usd: 0, graduated: false, lastUsd: 30_000, lastSource: "chain", lastAt: 1_000, changed: true });
+    expect(first).toEqual({
+      usd: 0,
+      graduated: false,
+      curveHigh: 0,
+      lastCurve: 0,
+      lastUsd: 30_000,
+      lastSource: "chain",
+      lastAt: 1_000,
+      changed: true,
+    });
 
     const second = mergeMarketMemory(first, { mcapUsd: 32_000, graduated: false, source: "chain" }, 2_000);
     expect(second).toMatchObject({ usd: 30_000, lastUsd: 32_000, lastAt: 2_000 });
@@ -240,13 +271,22 @@ describe("market memory", () => {
   it("starts over from memory saved before readings were confirmed", () => {
     // What the first live run stored on a test coin: a junk $14B high, never confirmed.
     const memory = mergeMarketMemory({ usd: 14_008_714_280, graduated: true }, { mcapUsd: 1_495_998, graduated: true, source: "dexscreener" }, 5);
-    expect(memory).toEqual({ usd: 0, graduated: true, lastUsd: 1_495_998, lastSource: "dexscreener", lastAt: 5, changed: true });
+    expect(memory).toMatchObject({ usd: 0, graduated: true, lastUsd: 1_495_998, lastSource: "dexscreener", lastAt: 5, changed: true });
   });
 
   it("keeps the high, graduation and the last good reading when every source fails", () => {
-    const before = { usd: 90_000, graduated: true, lastUsd: 95_000, lastSource: "chain", lastAt: 5 };
+    const before = { usd: 90_000, graduated: true, curveHigh: 1, lastCurve: 1, lastUsd: 95_000, lastSource: "chain", lastAt: 5 };
     const memory = mergeMarketMemory(before, { mcapUsd: 0, graduated: false, source: "none" }, 9);
     expect(memory).toEqual({ ...before, changed: false });
+  });
+
+  it("keeps the highest point of the curve, which only the chain reports", () => {
+    let memory = mergeMarketMemory(null, { mcapUsd: 9_000, graduated: false, curve: 0.42, source: "chain" });
+    expect(memory).toMatchObject({ curveHigh: 0.42, lastCurve: 0.42 });
+    memory = mergeMarketMemory(memory, { mcapUsd: 6_000, graduated: false, curve: 0.3, source: "chain" });
+    expect(memory).toMatchObject({ curveHigh: 0.42, lastCurve: 0.3 });
+    memory = mergeMarketMemory(memory, { mcapUsd: 0, graduated: false, source: "none" });
+    expect(memory).toMatchObject({ curveHigh: 0.42, lastCurve: 0.3 });
   });
 
   it("offers the last good reading only while it is fresh", () => {

@@ -1239,6 +1239,17 @@ body::before {
     width: var(--p);
     background: linear-gradient(90deg, var(--rubric-dark), var(--rubric));
   }
+  .curve-bar {
+    position: relative;
+  }
+  /* Where each seal breaks along the curve. */
+  .curve-notch {
+    position: absolute;
+    top: -0.15em;
+    bottom: -0.15em;
+    width: 1px;
+    background: rgba(42, 30, 20, 0.45);
+  }
   .mcap-to {
     font-size: 0.82em;
     font-style: italic;
@@ -1678,6 +1689,493 @@ body::before {
     color: #f3d98f;
   }
 
+  /* ---------------- Header: the other pages ---------------- */
+  .header-start {
+    display: flex;
+    align-items: center;
+    gap: 1.7rem;
+    min-width: 0;
+  }
+  .site-nav {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+  }
+  .site-nav-link {
+    padding: 0.25rem 0 0.15rem;
+    border-bottom: 1px solid transparent;
+    color: #d6c38f;
+    font-size: 1.1rem;
+    font-style: italic;
+    text-decoration: none;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .site-nav-link:hover {
+    color: var(--gold-light);
+    border-bottom-color: rgba(231, 196, 106, 0.5);
+  }
+  .site-nav-link[aria-current="page"] {
+    color: var(--gold-light);
+    border-bottom-color: var(--gold-light);
+  }
+
+  /* ---------------- Loose leaves on the desk: the lore and the ledger ---------------- */
+  .leaf-page {
+    box-sizing: border-box;
+    min-height: 100svh;
+    padding: calc(var(--header-h) + 3rem) 1rem 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* The lore: a manuscript leaf, text on the left, plain-words glosses in the right margin. */
+  .lore-sheet {
+    width: min(100%, 62rem);
+    padding: 4.2rem 4.4rem 3.6rem 5.2rem;
+  }
+  .lore-header {
+    margin-bottom: 2.2rem;
+  }
+  .lore-lede {
+    margin: 0.7rem 0 0;
+    font-size: 1.35rem;
+    font-style: italic;
+    color: var(--rubric);
+  }
+  .lore-chapter {
+    display: grid;
+    grid-template-columns: minmax(0, 34em) minmax(10rem, 1fr);
+    column-gap: 2.6rem;
+    margin-top: 2.4rem;
+    font-size: 1.2rem;
+    line-height: 1.62;
+  }
+  .lore-heading {
+    position: relative;
+    grid-column: 1 / -1;
+    margin: 0 0 0.55rem;
+    font-family: var(--font-fraktur), serif;
+    font-weight: 400;
+    font-size: 2rem;
+    line-height: 1.1;
+  }
+  /* The chapter number hangs in the left margin, in red. */
+  .lore-numeral {
+    position: absolute;
+    right: calc(100% + 1rem);
+    top: 0.45rem;
+    font-family: var(--font-garamond), serif;
+    font-size: 1.05rem;
+    font-style: italic;
+    color: var(--rubric);
+    white-space: nowrap;
+  }
+  .lore-gloss {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: start;
+    margin: 0.3rem 0 0;
+    padding-left: 1rem;
+    border-left: 1px solid rgba(168, 36, 27, 0.4);
+    font-size: 0.98rem;
+    line-height: 1.45;
+    font-style: italic;
+    color: var(--rubric);
+  }
+  .lore-text {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .lore-text p {
+    margin: 0 0 0.9em;
+  }
+  .lore-opening {
+    min-height: 4.6rem;
+  }
+  /* A roman capital reads at once; a blackletter O looks like a D. */
+  .lore-initial span {
+    font-family: var(--font-garamond), Georgia, serif;
+    font-weight: 600;
+    font-size: 3.5em;
+  }
+  .lore-initial {
+    float: left;
+    width: 5.1rem;
+    height: 5.1rem;
+    margin: 0.4rem 1rem 0.2rem 0;
+    font-size: 0.95rem;
+  }
+  .lore-ladder,
+  .lore-seals {
+    list-style: none;
+    margin: 0.2em 0 1.2em;
+    padding: 0;
+  }
+  .lore-ladder {
+    columns: 2;
+    column-gap: 2.2rem;
+  }
+  .lore-ladder li {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.8rem;
+    padding: 0.2em 0;
+    border-bottom: 1px dotted rgba(42, 30, 20, 0.32);
+    break-inside: avoid;
+  }
+  .lore-ladder-weight,
+  .lore-seal-mark span {
+    color: var(--ink-muted);
+    font-variant-numeric: oldstyle-nums;
+    white-space: nowrap;
+  }
+  .lore-ways {
+    margin: 0.1em 0 1em;
+  }
+  .lore-way {
+    display: grid;
+    grid-template-columns: 6.5rem 1fr;
+    gap: 1rem;
+    padding: 0.55em 0;
+    border-top: 1px solid rgba(42, 30, 20, 0.16);
+  }
+  .lore-way:last-child {
+    border-bottom: 1px solid rgba(42, 30, 20, 0.16);
+  }
+  .lore-way dt {
+    font-style: italic;
+  }
+  .lore-way dd {
+    margin: 0;
+  }
+  .lore-way--pencil dt {
+    color: var(--pencil);
+  }
+  .lore-way--red dt {
+    color: var(--rubric);
+  }
+  .lore-seals li {
+    display: grid;
+    grid-template-columns: 11rem 1fr;
+    gap: 1rem;
+    padding: 0.45em 0;
+    border-top: 1px solid rgba(42, 30, 20, 0.16);
+  }
+  .lore-seals li:last-child {
+    border-bottom: 1px solid rgba(42, 30, 20, 0.16);
+  }
+  .lore-seal-mark {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    color: var(--rubric);
+  }
+  .lore-seal-mark span {
+    font-size: 0.92em;
+    font-style: italic;
+  }
+  .lore-closing {
+    margin-top: 2.4rem;
+    padding-top: 1.8rem;
+    border-top: 1px solid rgba(168, 36, 27, 0.35);
+  }
+  .lore-hook {
+    margin: 0 0 1.2rem;
+    font-family: var(--font-fraktur), serif;
+    font-size: 2rem;
+    line-height: 1.15;
+  }
+  .lore-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem 1.6rem;
+    font-size: 1.15rem;
+  }
+  .lore-cta {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+  }
+
+  /* The ledger: an account book, the amounts behind a red double rule. */
+  .ledger-sheet {
+    width: min(100%, 62rem);
+    padding: 4.2rem 4.4rem 3.6rem;
+  }
+  .ledger-lede {
+    margin-bottom: 1.4rem;
+  }
+  .ledger-sum {
+    margin: 0 0 1.9rem;
+  }
+  .ledger-sum .count strong {
+    font-size: clamp(2.6rem, 6vw, 3.8rem);
+  }
+  .ledger-sum-line {
+    margin: 0.3rem 0 0;
+    font-size: 1.12rem;
+    font-style: italic;
+    color: var(--ink-muted);
+  }
+  .ledger-heading {
+    margin: 0 0 0.35rem;
+    font-family: var(--font-fraktur), serif;
+    font-weight: 400;
+    font-size: 1.65rem;
+    line-height: 1.15;
+  }
+  .ledger-rule {
+    margin: 0 0 2.2rem;
+    padding: 1.15rem 1.35rem 1.2rem;
+    border: 1px solid rgba(168, 36, 27, 0.35);
+    background: rgba(255, 248, 228, 0.32);
+    font-size: 1.13rem;
+    line-height: 1.55;
+  }
+  .ledger-rule p {
+    margin: 0;
+    max-width: 44em;
+  }
+  .ledger-rule .ledger-altar-line {
+    margin-top: 0.6rem;
+    font-style: italic;
+    color: var(--ink-muted);
+  }
+  .ledger-scroll {
+    margin: 0 0 2.4rem;
+    overflow-x: auto;
+  }
+  /* Phones get the ledger as a list of entries instead of the table. */
+  .ledger-list {
+    display: none;
+    list-style: none;
+    margin: 0 0 2.2rem;
+    padding: 0;
+    border-top: 2px solid rgba(42, 30, 20, 0.55);
+    font-variant-numeric: oldstyle-nums tabular-nums;
+  }
+  .ledger-list li {
+    display: grid;
+    grid-template-columns: 2rem minmax(0, 1fr) auto;
+    grid-template-areas:
+      "no by amount"
+      "no when proof";
+    gap: 0.15rem 0.6rem;
+    padding: 0.7rem 0.4rem 0.75rem 0;
+    border-bottom: 1px solid rgba(42, 30, 20, 0.16);
+  }
+  .ledger-list-no {
+    grid-area: no;
+    color: var(--rubric);
+  }
+  .ledger-list-amount {
+    grid-area: amount;
+    text-align: right;
+    white-space: nowrap;
+    font-size: 1.1em;
+  }
+  .ledger-list-amount .ledger-muted {
+    font-size: 0.82em;
+  }
+  .ledger-list-by {
+    grid-area: by;
+    min-width: 0;
+  }
+  .ledger-list-when {
+    grid-area: when;
+    font-size: 0.92em;
+    color: var(--ink-muted);
+  }
+  .ledger-list-proof {
+    grid-area: proof;
+    text-align: right;
+    font-size: 0.92em;
+  }
+  .ledger {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 1.08rem;
+    font-variant-numeric: oldstyle-nums tabular-nums;
+  }
+  .ledger th {
+    padding: 0.4rem 0.7rem 0.45rem;
+    border-bottom: 2px solid rgba(42, 30, 20, 0.55);
+    font-weight: 400;
+    font-style: italic;
+    text-align: left;
+    color: var(--ink-muted);
+  }
+  .ledger td {
+    padding: 0.6rem 0.7rem;
+    border-bottom: 1px solid rgba(42, 30, 20, 0.16);
+    vertical-align: baseline;
+  }
+  .ledger .ledger-no {
+    width: 2.6rem;
+    padding-left: 0;
+    color: var(--rubric);
+  }
+  .ledger-when {
+    white-space: nowrap;
+    color: var(--ink-muted);
+  }
+  .ledger .ledger-amount {
+    text-align: right;
+    white-space: nowrap;
+    border-left: 3px double rgba(168, 36, 27, 0.5);
+    border-right: 3px double rgba(168, 36, 27, 0.5);
+  }
+  .ledger td.ledger-amount {
+    font-size: 1.12em;
+  }
+  .ledger .ledger-proof {
+    padding-right: 0;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .ledger-row--altar td {
+    background: rgba(180, 138, 46, 0.09);
+  }
+  .ledger-altar {
+    font-style: italic;
+    color: #7a5512;
+  }
+  .ledger-by {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.1rem 0.6rem;
+  }
+  .ledger-title {
+    font-style: italic;
+    color: var(--ink-muted);
+  }
+  .ledger-name {
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: rgba(42, 30, 20, 0.35);
+    text-underline-offset: 3px;
+  }
+  .ledger-name:hover {
+    text-decoration-color: currentColor;
+  }
+  .ledger-muted {
+    font-style: italic;
+    color: var(--ink-muted);
+  }
+  .ledger-empty {
+    margin: 0 0 2.2rem;
+    font-size: 1.15rem;
+    font-style: italic;
+    color: var(--ink-muted);
+  }
+  .ledger-tops {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2.6rem;
+  }
+  .ledger-note {
+    margin: 0 0 0.7rem;
+    font-size: 1rem;
+    font-style: italic;
+    color: var(--ink-muted);
+  }
+  .ledger-top {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .ledger-top li {
+    display: grid;
+    grid-template-columns: 2rem 1fr auto;
+    align-items: baseline;
+    gap: 0.7rem;
+    padding: 0.6rem 0;
+    border-top: 1px solid rgba(42, 30, 20, 0.16);
+  }
+  .ledger-top li:last-child {
+    border-bottom: 1px solid rgba(42, 30, 20, 0.16);
+  }
+  .ledger-place {
+    font-style: italic;
+    color: #7a5512;
+  }
+  .ledger-top-who {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .ledger-top-title {
+    font-size: 1.12rem;
+  }
+  .ledger-top-amount {
+    white-space: nowrap;
+    color: var(--ink-muted);
+    font-variant-numeric: oldstyle-nums;
+  }
+  .ledger-tops--red .ledger-place,
+  .ledger-tops--red .ledger-top-title {
+    color: var(--rubric);
+  }
+  .ledger-demo {
+    margin-top: 2rem;
+  }
+
+  @media (max-width: 760px) {
+    .lore-sheet,
+    .ledger-sheet {
+      padding: 2.8rem 1.35rem 2.4rem;
+    }
+    .lore-chapter {
+      grid-template-columns: minmax(0, 1fr);
+      font-size: 1.1rem;
+    }
+    .lore-numeral {
+      position: static;
+      margin-right: 0.6rem;
+    }
+    .lore-gloss {
+      grid-column: 1;
+      grid-row: 2;
+      margin: 0 0 0.9rem;
+    }
+    .lore-text {
+      grid-row: 3;
+    }
+    .lore-ladder {
+      columns: 1;
+    }
+    .lore-way,
+    .lore-seals li {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.15rem;
+    }
+    .ledger-tops {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 2rem;
+    }
+    .ledger-scroll {
+      display: none;
+    }
+    .ledger-list {
+      display: block;
+    }
+    .lore-initial {
+      width: 3.9rem;
+      height: 3.9rem;
+      font-size: 0.72rem;
+    }
+  }
+
+  @media (max-width: 430px) {
+    /* The X link is in the colophon too; the header keeps room for the pages. */
+    .header-x {
+      display: none;
+    }
+  }
+
   /* ---------------- Modes ---------------- */
   @media (min-width: 900px) and (min-aspect-ratio: 1/1) {
     .book-scroll--spread {
@@ -1708,6 +2206,15 @@ body::before {
     }
     .header-x .long {
       display: none;
+    }
+    .header-start {
+      gap: 0.9rem;
+    }
+    .site-nav {
+      gap: 0.8rem;
+    }
+    .site-nav-link {
+      font-size: 1rem;
     }
     .header-cta {
       padding: 0 0.8rem;

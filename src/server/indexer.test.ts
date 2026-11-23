@@ -1,6 +1,17 @@
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { beforeAll, describe, expect, it } from "vitest";
-import { booksFromDb, entryOf, readState, recentTraitors, tryLock, unlock, type AnyDb } from "@/db/books";
+import {
+  booksFromDb,
+  burnsFromDb,
+  entryOf,
+  readState,
+  recentTraitors,
+  richestFaithful,
+  tryLock,
+  unlock,
+  worstTraitors,
+  type AnyDb,
+} from "@/db/books";
 import { testDb } from "@/db/test-db";
 import { DAY_MS } from "@/lib/basilisk/config";
 import type { ParsedTransaction, TokenBalance } from "@/lib/solana/parse";
@@ -60,6 +71,38 @@ function transfer(signature: string, at: number, from: string, fromBefore: numbe
       postTokenBalances: [bal(2, from, fromBefore - amount), bal(3, to, toBefore + amount)],
     },
     transaction: { signatures: [signature], message: { accountKeys: [{ pubkey: from }, { pubkey: to }] } },
+  };
+}
+
+/** Tokens burned by their owner, directly or inside another program (a burner app). */
+function burn(signature: string, at: number, owner: string, before: number, amount: number, inner = false): ParsedTransaction {
+  const instruction = {
+    program: "spl-token",
+    programId: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    parsed: {
+      type: "burnChecked",
+      info: { account: "owner-ata", mint: MINT, authority: owner, tokenAmount: { amount: raw(amount), decimals: 6 } },
+    },
+  };
+  return {
+    blockTime: at / 1000,
+    slot: at / 1000,
+    meta: {
+      err: null,
+      fee: 5_000,
+      preBalances: [10_000_000_000, 2_039_280],
+      postBalances: [10_000_000_000 - 5_000, 2_039_280],
+      preTokenBalances: [bal(1, owner, before)],
+      postTokenBalances: [bal(1, owner, before - amount)],
+      innerInstructions: inner ? [{ index: 0, instructions: [instruction] }] : [],
+    },
+    transaction: {
+      signatures: [signature],
+      message: {
+        accountKeys: [{ pubkey: owner }, { pubkey: "owner-ata" }],
+        instructions: inner ? [{ programId: "BurnerApp1111111111111111111111111111111111" }] : [instruction],
+      },
+    },
   };
 }
 
@@ -170,6 +213,56 @@ describe("the sales indexer", () => {
     expect(third.cursor.head).toBe("s11");
   });
 });
+
+describe("burns and the tops of both Books", () => {
+  let db: AnyDb;
+  const chain = new FakeChain();
+  let ALTAR = "";
+
+  beforeAll(async () => {
+    [A, B, ALTAR] = await Promise.all([wallet(), wallet(), wallet()]);
+    db = await testDb();
+    chain.add(swap("t1", day(1), A, 0, 2_000_000, -600_000_000));
+    chain.add(swap("t2", day(1) + 60_000, B, 0, 300_000, -90_000_000));
+    chain.add(swap("t3", day(2), A, 2_000_000, -1_900_000, 500_000_000));
+    chain.add(burn("burn-holder", day(3), B, 300_000, 50_000));
+    chain.add(burn("burn-altar", day(4), ALTAR, 1_000_000, 1_000_000, true));
+  });
+
+  it("records every burn, the Altar's too, and numbers them from the first", async () => {
+    const result = await runIndexer({ db, mint: MINT, source: chain, now: day(5), sealsBroken: 2, budget: 10, exclude: [ALTAR] });
+    expect(result.burns).toBe(2);
+    const { count, total, entries, byBurner } = await burnsFromDb(db);
+    expect(count).toBe(2);
+    expect(total).toBe(1_050_000);
+    expect(entries.map((entry) => [entry.number, entry.signature])).toEqual([
+      [2, "burn-altar"],
+      [1, "burn-holder"],
+    ]);
+    // The holder is in the Book; the Altar is kept out of it.
+    expect(entries[1]).toMatchObject({ burner: B, amount: 50_000, status: "faithful" });
+    expect(entries[0]).toMatchObject({ burner: ALTAR, status: null });
+    expect(byBurner.get(ALTAR)).toBe(1_000_000);
+  });
+
+  it("knows the biggest holders and the worst traitors", async () => {
+    expect(await richestFaithful(db, 3)).toEqual([B]);
+    expect((await worstTraitors(db, 3)).map((row) => [row.address, row.amount])).toEqual([[A, 1_900_000]]);
+  });
+
+  it("a second run stores nothing twice", async () => {
+    await writeCursorBack(db);
+    const result = await runIndexer({ db, mint: MINT, source: chain, now: day(5), sealsBroken: 2, budget: 10, exclude: [ALTAR] });
+    expect(result.burns).toBe(0);
+    expect((await burnsFromDb(db)).count).toBe(2);
+  });
+});
+
+/** Forget where the indexer stopped, so the next run reads everything again. */
+async function writeCursorBack(db: AnyDb) {
+  const { writeState } = await import("@/db/books");
+  await writeState(db, CURSOR_KEY, { head: null, tail: null, backfillDone: false });
+}
 
 describe("the indexer lock", () => {
   it("lets one run in at a time and frees itself", async () => {

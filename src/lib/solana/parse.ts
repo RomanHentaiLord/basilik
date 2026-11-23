@@ -12,6 +12,13 @@ export interface TokenBalance {
   uiTokenAmount: { amount: string; decimals: number };
 }
 
+/** An instruction as `jsonParsed` shows it: parsed for known programs (the token programs among them). */
+export interface ParsedInstruction {
+  program?: string;
+  programId?: string;
+  parsed?: { type?: string; info?: Record<string, unknown> } | string;
+}
+
 export interface ParsedTransaction {
   blockTime: number | null;
   slot: number;
@@ -26,6 +33,8 @@ export interface ParsedTransaction {
     postTokenBalances?: TokenBalance[];
     /** Accounts loaded from lookup tables (v0 messages in plain "json" encoding). */
     loadedAddresses?: { writable: string[]; readonly: string[] };
+    /** Instructions run by programs on the transaction's behalf (a burn inside a swap, a burner app). */
+    innerInstructions?: { index: number; instructions: ParsedInstruction[] }[];
   } | null;
   transaction: {
     signatures: string[];
@@ -34,6 +43,7 @@ export interface ParsedTransaction {
       accountKeys?: ({ pubkey: string } | string)[];
       /** Some encodings list only the static keys here and the rest in meta.loadedAddresses. */
       staticAccountKeys?: string[];
+      instructions?: ParsedInstruction[];
     };
   };
 }
@@ -157,4 +167,47 @@ export function parseTransaction(
     kind,
     amount,
   };
+}
+
+/** A burn of the coin: tokens destroyed by the token program, so the supply really shrinks. */
+export interface Burn {
+  signature: string;
+  /** The wallet that signed the burn (owner of the burned tokens). */
+  burner: string | null;
+  /** Tokens burned, in UI units. */
+  amount: number;
+  at: number;
+}
+
+/**
+ * Every Burn / BurnChecked of `mint` in the transaction, top-level or inside another program,
+ * added up per burner. Sending tokens to a "dead" address is not a burn and is not counted.
+ */
+export function parseBurns(tx: ParsedTransaction, mint: string): Burn[] {
+  if (!tx.meta || tx.meta.err) return [];
+  const instructions = [
+    ...(tx.transaction.message.instructions ?? []),
+    ...(tx.meta.innerInstructions ?? []).flatMap((inner) => inner.instructions),
+  ];
+  const fallbackDecimals = decimalsOf(tx, mint);
+  const byBurner = new Map<string | null, number>();
+  for (const instruction of instructions) {
+    const parsed = typeof instruction.parsed === "object" ? instruction.parsed : null;
+    if (!parsed || (parsed.type !== "burn" && parsed.type !== "burnChecked")) continue;
+    const info = parsed.info ?? {};
+    if (info.mint !== mint) continue;
+    const tokenAmount = info.tokenAmount as { amount?: string; decimals?: number } | undefined;
+    const raw = tokenAmount?.amount ?? (typeof info.amount === "string" ? info.amount : null);
+    if (raw === null) continue;
+    const decimals = tokenAmount?.decimals ?? fallbackDecimals;
+    const amount = Number(BigInt(raw)) / 10 ** decimals;
+    const burner = (info.authority ?? info.multisigAuthority ?? null) as string | null;
+    byBurner.set(burner, (byBurner.get(burner) ?? 0) + amount);
+  }
+  return [...byBurner].map(([burner, amount]) => ({
+    signature: tx.transaction.signatures[0],
+    burner,
+    amount,
+    at: (tx.blockTime ?? 0) * 1000,
+  }));
 }
