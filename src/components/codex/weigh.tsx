@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, type CSSProperties } from "react";
-import { FAITHFUL_THRESHOLD, RANKS, RANK_FLOORS, REDEMPTION_DAYS, type Rank } from "@/lib/basilisk/config";
+import { FAITHFUL_THRESHOLD, RANKS, RANK_FLOORS, REDEMPTION_MS, type Rank } from "@/lib/basilisk/config";
 import {
   BOOK,
   PUNISHMENT_FATES,
@@ -12,7 +12,7 @@ import {
 } from "@/lib/basilisk/copy";
 import { PUNISHMENTS } from "@/lib/basilisk/flavor";
 import { rankByBalance } from "@/lib/basilisk/judge";
-import { formatTokens, formatTokensShort } from "@/lib/format";
+import { formatDuration, formatTokens, formatTokensShort } from "@/lib/format";
 
 type Deeds = keyof typeof BOOK.deeds;
 type Tone = "ink" | "pencil" | "red" | "outside";
@@ -81,7 +81,7 @@ function reckon(tokens: number, deeds: Deeds): Reckoning {
     return {
       title: PUNISHMENT_TITLES[punishment],
       fate: PUNISHMENT_FATES[punishment],
-      hint: `To be forgiven: buy back ${formatTokens(FAITHFUL_THRESHOLD)} and hold for ${REDEMPTION_DAYS} days.`,
+      hint: `To be forgiven: buy back ${formatTokens(FAITHFUL_THRESHOLD)} and hold it for ${formatDuration(REDEMPTION_MS)}.`,
       tone: "red",
     };
   }
@@ -89,7 +89,7 @@ function reckon(tokens: number, deeds: Deeds): Reckoning {
     return {
       title: `Doubting ${rankTitle(rank)}`,
       fate: STATUS_FATES.doubter,
-      hint: "Seven days without a sale and the pencil turns to ink.",
+      hint: "An hour without a sale and the pencil turns to ink.",
       tone: "pencil",
     };
   }

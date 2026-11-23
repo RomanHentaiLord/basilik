@@ -31,6 +31,8 @@ export interface MarketReading extends MarketState {
 export interface Quote {
   mcapUsd?: number;
   graduated?: boolean;
+  /** Share of the bonding curve sold, 0–1 (the chain only). */
+  curve?: number;
 }
 
 export type Provider = (mint: string) => Promise<Quote | null>;
@@ -49,9 +51,14 @@ const WSOL = "So11111111111111111111111111111111111111112";
 export interface BondingCurve {
   virtualTokenReserves: bigint;
   virtualSolReserves: bigint;
+  /** Tokens still for sale on the curve (raw units). */
+  realTokenReserves: bigint;
   tokenTotalSupply: bigint;
   complete: boolean;
 }
+
+/** Every pump.fun curve starts with 793.1M tokens for sale (6 decimals); the bond comes when they are gone. */
+export const INITIAL_REAL_TOKEN_RESERVES = BigInt(793_100_000) * BigInt(1_000_000);
 
 export function decodeBondingCurve(data: Uint8Array): BondingCurve | null {
   if (data.length < 49) return null;
@@ -59,9 +66,17 @@ export function decodeBondingCurve(data: Uint8Array): BondingCurve | null {
   return {
     virtualTokenReserves: view.getBigUint64(8, true),
     virtualSolReserves: view.getBigUint64(16, true),
+    realTokenReserves: view.getBigUint64(24, true),
     tokenTotalSupply: view.getBigUint64(40, true),
     complete: data[48] !== 0,
   };
+}
+
+/** Share of the curve sold, 0–1: what pump.fun shows as "bonding curve progress". */
+export function curveProgress(curve: BondingCurve): number {
+  if (curve.complete) return 1;
+  const left = Number(curve.realTokenReserves) / Number(INITIAL_REAL_TOKEN_RESERVES);
+  return Math.min(1, Math.max(0, 1 - left));
 }
 
 /** Market cap of a coin on the curve, in SOL. Token units cancel out; lamports become SOL. */
@@ -122,10 +137,13 @@ export const chain: Provider = async (mint) => {
   if (!account?.value) return null; // Not a pump.fun coin.
   const curve = decodeBondingCurve(Buffer.from(account.value.data[0], "base64"));
   if (!curve) return null;
-  // After graduation the curve is frozen; the price lives in the new pool.
-  if (curve.complete) return { graduated: true };
+  // After the bond the curve is frozen; the price lives in the new pool.
+  if (curve.complete) return { graduated: true, curve: 1 };
+  const progress = curveProgress(curve);
   const sol = await solUsd();
-  return sol ? { mcapUsd: curveMarketCapSol(curve) * sol, graduated: false } : { graduated: false };
+  return sol
+    ? { mcapUsd: curveMarketCapSol(curve) * sol, graduated: false, curve: progress }
+    : { graduated: false, curve: progress };
 };
 
 // ── Price sites ────────────────────────────────────────────────────────────
@@ -236,13 +254,20 @@ export async function getMarketState(
   groups: [ProviderName, Provider][][] = PROVIDERS,
   timeoutMs = TIMEOUT_MS,
 ): Promise<MarketReading> {
-  const override = process.env.MARKET_MCAP_USD;
-  if (override) {
-    return { mcapUsd: Number(override), graduated: process.env.MARKET_GRADUATED === "true", source: "override" };
+  const { MARKET_MCAP_USD, MARKET_CURVE_PERCENT, MARKET_GRADUATED } = process.env;
+  if (MARKET_MCAP_USD || MARKET_CURVE_PERCENT || MARKET_GRADUATED) {
+    const graduated = MARKET_GRADUATED === "true";
+    return {
+      mcapUsd: Number(MARKET_MCAP_USD ?? 0),
+      graduated,
+      curve: graduated ? 1 : Math.min(1, Number(MARKET_CURVE_PERCENT ?? 0) / 100),
+      source: "override",
+    };
   }
 
   const failures: string[] = [];
   let graduated: boolean | undefined;
+  let curve: number | undefined;
 
   for (const group of groups) {
     // The group is asked at once; answers are read in order of trust, so a fast trusted
@@ -252,16 +277,19 @@ export async function getMarketState(
       const [name] = group[index];
       const { quote, error } = await pending[index];
       if (error) failures.push(`${name}: ${error}`);
-      if (name === "chain" && quote?.graduated !== undefined) graduated = quote.graduated;
+      if (name === "chain" && quote) {
+        graduated = quote.graduated ?? graduated;
+        curve = quote.curve ?? curve;
+      }
       if (plausible(quote?.mcapUsd)) {
-        return { mcapUsd: quote.mcapUsd, graduated: graduated ?? false, source: name };
+        return { mcapUsd: quote.mcapUsd, graduated: graduated ?? false, curve, source: name };
       }
     }
   }
 
   console.error(`[market] no market cap for ${mint}${failures.length > 0 ? ` (${failures.join("; ")})` : ""}`);
-  return { mcapUsd: 0, graduated: graduated ?? false, source: "none" };
+  return { mcapUsd: 0, graduated: graduated ?? false, curve, source: "none" };
 }
 
-/** Market used in demo mode: three seals broken, halfway to the fourth. */
-export const DEMO_MARKET: MarketState = { mcapUsd: 312_000, graduated: true };
+/** Market used in demo mode: 47% of the curve sold, three seals broken, halfway to the fourth. */
+export const DEMO_MARKET: MarketState = { mcapUsd: 11_800, graduated: false, curve: 0.475, curveHigh: 0.475 };

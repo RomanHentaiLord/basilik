@@ -18,7 +18,7 @@ export type { BooksOverview, FaithfulRow, FeedItem, TraitorRow } from "@/db/book
 const DEMO_WALLETS = 1543;
 
 /** Deterministic, valid-looking Solana addresses (32 pseudo-random bytes, base58). */
-function demoAddress(index: number): string {
+export function demoAddress(index: number): string {
   const bytes = new Uint8Array(32);
   let seed = fnv1a(`demo-wallet:${index}`);
   for (let i = 0; i < 32; i++) {
@@ -42,9 +42,9 @@ const EMPTY: BooksOverview = {
 /**
  * Before launch: judge a fixed crowd of imaginary wallets with the real rules,
  * so the Books on the page agree with what the judge says for those addresses.
- * Cached for an hour — the result depends on "now" only by whole days.
+ * Cached for an hour: tenure moves in hours, so the demo ranks may lag by one mark.
  */
-async function demoVerdicts(): Promise<Verdict[]> {
+export async function demoVerdicts(): Promise<Verdict[]> {
   "use cache";
   cacheLife("hours");
 

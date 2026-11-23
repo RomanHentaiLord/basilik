@@ -1,9 +1,4 @@
-import {
-  DAY_MS,
-  FAITHFUL_THRESHOLD,
-  REDEMPTION_DAYS,
-  TRAITOR_SELL_SHARE,
-} from "./config";
+import { FAITHFUL_THRESHOLD, REDEMPTION_MS, TRAITOR_SELL_SHARE } from "./config";
 import type { WalletEvent } from "./types";
 
 /**
@@ -32,7 +27,7 @@ function isForgivenAt(ledger: Ledger, at: number): boolean {
   return (
     ledger.traitorAt !== null &&
     ledger.redemptionStart !== null &&
-    at - ledger.redemptionStart >= REDEMPTION_DAYS * DAY_MS
+    at - ledger.redemptionStart >= REDEMPTION_MS
   );
 }
 

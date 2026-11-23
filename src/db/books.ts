@@ -1,9 +1,9 @@
-import { and, asc, count, desc, eq, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, lt, notInArray, or, sql } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { FIRST_WITNESS_COUNT } from "@/lib/basilisk/config";
 import type { Verdict, WalletEvent } from "@/lib/basilisk/types";
 import type * as schema from "./schema";
-import { events, indexerState, wallets } from "./schema";
+import { burns, events, indexerState, wallets } from "./schema";
 
 /**
  * Everything the site reads from and writes to the two Books.
@@ -21,6 +21,10 @@ export interface MarketMemory {
   /** Highest confirmed market cap. */
   usd: number;
   graduated?: boolean;
+  /** Highest share of the bonding curve ever sold (0–1), straight from the chain: this breaks seals. */
+  curveHigh?: number;
+  /** The curve at the last reading from the chain. */
+  lastCurve?: number;
   /** The last reading that had a price. A new high only counts once the next one reaches it too. */
   lastUsd?: number;
   /** Where that reading came from (chain, dexscreener…) and when (ms). */
@@ -36,7 +40,7 @@ export interface MarketMemory {
  */
 export function mergeMarketMemory(
   memory: MarketMemory | null,
-  reading: { mcapUsd: number; graduated: boolean; source?: string },
+  reading: { mcapUsd: number; graduated: boolean; curve?: number; source?: string },
   now = Date.now(),
 ): Required<MarketMemory> & { changed: boolean } {
   // Memory saved before readings were confirmed has no lastUsd and may hold one bad reading
@@ -46,6 +50,9 @@ export function mergeMarketMemory(
   const confirmed = priced ? Math.min(known?.lastUsd ?? 0, reading.mcapUsd) : 0;
   const usd = Math.max(known?.usd ?? 0, confirmed);
   const graduated = Boolean(known?.graduated) || reading.graduated;
+  // The curve comes from the chain, not a price site: one reading is enough, and it only grows.
+  const curveHigh = graduated ? 1 : Math.max(memory?.curveHigh ?? 0, reading.curve ?? 0);
+  const lastCurve = reading.curve ?? memory?.lastCurve ?? 0;
   const lastUsd = priced ? reading.mcapUsd : (known?.lastUsd ?? 0);
   const lastSource = priced ? (reading.source ?? "unknown") : (known?.lastSource ?? "none");
   const lastAt = priced ? now : (known?.lastAt ?? 0);
@@ -53,9 +60,11 @@ export function mergeMarketMemory(
     !known ||
     usd !== known.usd ||
     graduated !== Boolean(known.graduated) ||
+    curveHigh !== (known.curveHigh ?? 0) ||
+    lastCurve !== (known.lastCurve ?? 0) ||
     lastUsd !== known.lastUsd ||
     lastAt !== (known.lastAt ?? 0);
-  return { usd, graduated, lastUsd, lastSource, lastAt, changed };
+  return { usd, graduated, curveHigh, lastCurve, lastUsd, lastSource, lastAt, changed };
 }
 
 /** The last good reading, if it is at most `maxAgeMs` old. */
@@ -357,4 +366,142 @@ export async function tryLock(db: AnyDb, key: string, ttlMs: number, now = new D
 
 export async function unlock(db: AnyDb, key: string): Promise<void> {
   await db.update(indexerState).set({ updatedAt: new Date(0) }).where(eq(indexerState.key, key));
+}
+
+// ── Burns ──────────────────────────────────────────────────────────────────
+
+export interface BurnInput {
+  signature: string;
+  burner: string | null;
+  amount: number;
+  at: number;
+  /** Seals broken at the time. */
+  seal: number | null;
+}
+
+export interface BurnEntry {
+  /** No. 1 is the first burn ever. */
+  number: number;
+  signature: string;
+  burner: string | null;
+  amount: number;
+  at: number;
+  /** The burner's entry in the Books, if it has one. */
+  title: string | null;
+  status: string | null;
+}
+
+/** Stores burns, one row per transaction; burns already stored are skipped. */
+export async function saveBurns(db: AnyDb, rows: BurnInput[]): Promise<number> {
+  // A transaction burning for two wallets (rare) is kept as one offering by the larger burner.
+  const bySignature = new Map<string, BurnInput>();
+  for (const row of rows) {
+    const known = bySignature.get(row.signature);
+    if (!known) bySignature.set(row.signature, row);
+    else
+      bySignature.set(row.signature, {
+        ...(row.amount > known.amount ? row : known),
+        amount: known.amount + row.amount,
+      });
+  }
+  const unique = [...bySignature.values()];
+  if (unique.length === 0) return 0;
+  const result = await db
+    .insert(burns)
+    .values(
+      unique.map((row) => ({
+        signature: row.signature,
+        burner: row.burner,
+        amount: row.amount,
+        seal: row.seal,
+        at: new Date(row.at),
+      })),
+    )
+    .onConflictDoNothing({ target: burns.signature })
+    .returning({ id: burns.id });
+  return result.length;
+}
+
+/** The newest burns, numbered from the first one ever, with totals. */
+export async function burnsFromDb(
+  db: AnyDb,
+  limit = 50,
+): Promise<{ count: number; total: number; byBurner: Map<string, number>; entries: BurnEntry[] }> {
+  const [totals] = await db
+    .select({ count: count(), total: sql<number>`coalesce(sum(${burns.amount}), 0)`.mapWith(Number) })
+    .from(burns);
+  const perBurner = await db
+    .select({ burner: burns.burner, total: sql<number>`sum(${burns.amount})`.mapWith(Number) })
+    .from(burns)
+    .where(isNotNull(burns.burner))
+    .groupBy(burns.burner);
+  const rows = await db
+    .select({
+      signature: burns.signature,
+      burner: burns.burner,
+      amount: burns.amount,
+      at: burns.at,
+      title: wallets.title,
+      status: wallets.status,
+    })
+    .from(burns)
+    .leftJoin(wallets, eq(wallets.address, burns.burner))
+    .orderBy(desc(burns.at), desc(burns.id))
+    .limit(limit);
+  const total = Number(totals?.count ?? 0);
+  return {
+    count: total,
+    total: totals?.total ?? 0,
+    byBurner: new Map(perBurner.map((row) => [row.burner as string, row.total])),
+    entries: rows.map((row, index) => ({
+      number: total - index,
+      signature: row.signature,
+      burner: row.burner,
+      amount: row.amount,
+      at: row.at.getTime(),
+      title: row.title,
+      status: row.status,
+    })),
+  };
+}
+
+/** The biggest holders written in ink: candidates for the top of the Order. */
+export async function richestFaithful(db: AnyDb, limit: number, exclude: string[] = []): Promise<string[]> {
+  const rows = await db
+    .select({ address: wallets.address })
+    .from(wallets)
+    .where(
+      and(inArray(wallets.status, IN_THE_BOOK), exclude.length > 0 ? notInArray(wallets.address, exclude) : undefined),
+    )
+    .orderBy(desc(wallets.balance))
+    .limit(limit);
+  return rows.map((row) => row.address);
+}
+
+/** The traitors who sold the most in their betrayal. */
+export async function worstTraitors(db: AnyDb, limit: number, exclude: string[] = []): Promise<TraitorRow[]> {
+  const rows = await db
+    .select({ address: wallets.address, title: wallets.title, amount: wallets.betrayalAmount, at: wallets.traitorAt })
+    .from(wallets)
+    .where(
+      and(
+        eq(wallets.status, "traitor"),
+        isNotNull(wallets.betrayalAmount),
+        exclude.length > 0 ? notInArray(wallets.address, exclude) : undefined,
+      ),
+    )
+    .orderBy(desc(wallets.betrayalAmount))
+    .limit(limit);
+  return rows.map((row) => ({ address: row.address, amount: row.amount, punishment: row.title, at: toMs(row.at) }));
+}
+
+/** Wallets in the Books whose verdict is the oldest: time alone can change them (tenure, repentance). */
+export async function stalestWallets(db: AnyDb, limit: number): Promise<string[]> {
+  const rows = await db
+    .select({ address: wallets.address })
+    .from(wallets)
+    .where(inArray(wallets.status, [...IN_THE_BOOK, "traitor"]))
+    .orderBy(asc(wallets.updatedAt))
+    .limit(limit);
+  return rows.map((row) => row.address);
 }

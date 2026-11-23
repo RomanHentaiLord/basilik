@@ -8,10 +8,10 @@ import { identityLabel, useIdentity } from "./identity";
 import { goToChapter, requestJudgment } from "./judge-link";
 
 /** The header button: "Who am I?" until the visitor has judged their own wallet, then their rank. */
-export function WhoAmI() {
+export function WhoAmI({ href = "#judgment" }: { href?: string }) {
   const me = useIdentity();
   return (
-    <a className="header-cta codex-focus" href="#judgment" aria-label={me ? `${JUDGMENT.header.you}: ${me.title}` : undefined}>
+    <a className="header-cta codex-focus" href={href} aria-label={me ? `${JUDGMENT.header.you}: ${me.title}` : undefined}>
       {me ? (
         <>
           <span className="long">{JUDGMENT.header.you}:&nbsp;</span>

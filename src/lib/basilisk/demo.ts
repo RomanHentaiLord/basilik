@@ -1,4 +1,4 @@
-import { DAY_MS, RANKS, RANK_FLOORS, type Rank } from "./config";
+import { DAY_MS, HOUR_MS, MINUTE_MS, RANKS, RANK_FLOORS, type Rank } from "./config";
 import { fnv1a } from "./flavor";
 import type { WalletEvent, WalletHistory } from "./types";
 
@@ -59,8 +59,10 @@ export function demoHistory(address: string, now: number): WalletHistory {
   const vary = (base: number, spread: number) =>
     Math.round((base * (1 - spread / 2 + ((h % 1000) / 1000) * spread)) / 1000) * 1000;
   const shift = h % 5;
-  // Some holders have held long enough for tenure to lift them.
-  const heldDays = 6 + ((h >>> 10) % 70);
+  // Holding times spread over the tenure marks (1 h, 2 h, 3 h, 1 day, 7 days), so some
+  // holders are lifted by tenure and some are not yet.
+  const HELD = [10 * MINUTE_MS, 40 * MINUTE_MS, 70 * MINUTE_MS, 150 * MINUTE_MS, 5 * HOUR_MS, 30 * HOUR_MS, 8 * DAY_MS];
+  const heldMs = HELD[(h >>> 10) % HELD.length];
 
   const push = (kind: WalletEvent["kind"], amount: number, at: number) => {
     balance += kind === "buy" || kind === "in" ? amount : -amount;
@@ -75,7 +77,7 @@ export function demoHistory(address: string, now: number): WalletHistory {
 
   if (isRank(scenario)) {
     // 1.5x the floor, ±25%: always inside the rank's band on the 1-2-5 ladder.
-    push("buy", vary(RANK_FLOORS[scenario] * 1.5, 0.5), day(heldDays));
+    push("buy", vary(RANK_FLOORS[scenario] * 1.5, 0.5), now - heldMs);
     return { address, balance, events };
   }
 
@@ -88,7 +90,8 @@ export function demoHistory(address: string, now: number): WalletHistory {
     case "doubter": {
       const bought = vary(900_000, 0.8);
       push("buy", bought, day(25 + shift));
-      push("sell", Math.round(bought * 0.2), day(2));
+      // Within the last hour: still in pencil.
+      push("sell", Math.round(bought * 0.2), now - (15 + shift * 5) * MINUTE_MS);
       break;
     }
     case "traitor": {

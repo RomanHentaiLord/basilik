@@ -38,6 +38,8 @@ export type IndexerOutcome =
       marketSource: string;
       athMcapUsd: number;
       graduated: boolean;
+      /** Share of the bonding curve sold, in percent. */
+      curvePercent: number;
       sealsBroken: number;
     } & IndexerResult)
   | { ran: false; reason: "demo" | "no-database" | "no-rpc" | "recent" | "busy" };
@@ -67,13 +69,20 @@ export async function runIndexerOnce({ force = false }: { force?: boolean } = {}
       const saved: MarketMemory = {
         usd: memory.usd,
         graduated: memory.graduated,
+        curveHigh: memory.curveHigh,
+        lastCurve: memory.lastCurve,
         lastUsd: memory.lastUsd,
         lastSource: memory.lastSource,
         lastAt: memory.lastAt,
       };
       await writeState(db, MARKET_ATH_KEY, saved);
     }
-    const sealsBroken = countBrokenSeals({ mcapUsd: market.mcapUsd, graduated: memory.graduated, athMcapUsd: memory.usd });
+    const sealsBroken = countBrokenSeals({
+      mcapUsd: market.mcapUsd,
+      graduated: memory.graduated,
+      curve: market.curve,
+      curveHigh: memory.curveHigh,
+    });
 
     const exclude = [process.env.ALTAR_WALLET?.trim()].filter((address): address is string => Boolean(address));
     const result = await runIndexer({ db, mint, source: rpcSource(mint), now, sealsBroken, budget: BUDGET, exclude });
@@ -91,6 +100,7 @@ export async function runIndexerOnce({ force = false }: { force?: boolean } = {}
       marketSource: market.source,
       athMcapUsd: memory.usd,
       graduated: memory.graduated,
+      curvePercent: Math.round((market.curve ?? memory.lastCurve) * 1000) / 10,
       sealsBroken,
       ...result,
     };

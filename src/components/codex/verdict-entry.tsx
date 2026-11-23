@@ -2,11 +2,11 @@
 
 import { motion, useReducedMotion, type TargetAndTransition, type Transition } from "motion/react";
 import { useId, useState } from "react";
-import { FAITHFUL_THRESHOLD, REDEMPTION_DAYS, REPENTANCE_SEAL } from "@/lib/basilisk/config";
+import { FAITHFUL_THRESHOLD, REDEMPTION_MS, REPENTANCE_SEAL } from "@/lib/basilisk/config";
 import { CODEX, JUDGMENT, ORDINALS, RANK_TITLES, SEAL_PROPHECIES, SITE } from "@/lib/basilisk/copy";
-import { daysUntilInk, nextRankStep, tokensToEnter } from "@/lib/basilisk/progress";
+import { nextRankStep, tokensToEnter, untilInk } from "@/lib/basilisk/progress";
 import type { Verdict } from "@/lib/basilisk/types";
-import { formatDay, formatDays, formatTokens, formatTokensShort } from "@/lib/format";
+import { formatDay, formatDuration, formatTokens, formatTokensShort } from "@/lib/format";
 import { shortAddress } from "@/lib/solana/address";
 import { CopyButton } from "./copy-address";
 import { Emblem } from "./ornaments";
@@ -225,9 +225,9 @@ function Stats({ verdict, now, sealsBroken }: { verdict: Verdict; now: number; s
           <Item term={JUDGMENT.repentance}>
             {sealsBroken < REPENTANCE_SEAL
               ? JUDGMENT.repentLocked
-              : verdict.redemptionDaysLeft !== null
-                ? `${formatDays(verdict.redemptionDaysLeft)} left`
-                : `Buy back ${formatTokensShort(FAITHFUL_THRESHOLD)}, hold ${REDEMPTION_DAYS} days`}
+              : verdict.redemptionMsLeft !== null
+                ? `${formatDuration(verdict.redemptionMsLeft, "up")} left`
+                : `Buy back ${formatTokensShort(FAITHFUL_THRESHOLD)}, hold ${formatDuration(REDEMPTION_MS)}`}
           </Item>
           {!verdict.demo && verdict.betrayalSignature && (
             <Item term="Proof">
@@ -244,12 +244,12 @@ function Stats({ verdict, now, sealsBroken }: { verdict: Verdict; now: number; s
         </>
       );
     case "doubter": {
-      const days = daysUntilInk(verdict.lastSellAt, now);
+      const ink = untilInk(verdict.lastSellAt, now);
       return (
         <>
           <Item term={JUDGMENT.holding}>{formatTokens(verdict.balance)}</Item>
           {verdict.lastSellAt !== null && <Item term={JUDGMENT.lastSale}>{formatDay(verdict.lastSellAt)}</Item>}
-          {days !== null && <Item term={JUDGMENT.inkIn}>{formatDays(days)}</Item>}
+          {ink !== null && <Item term={JUDGMENT.inkIn}>{formatDuration(ink, "up")}</Item>}
         </>
       );
     }
@@ -258,12 +258,16 @@ function Stats({ verdict, now, sealsBroken }: { verdict: Verdict; now: number; s
       return (
         <>
           <Item term={JUDGMENT.holding}>{formatTokens(verdict.balance)}</Item>
-          <Item term={JUDGMENT.heldFor}>{formatDays(verdict.tenureDays)}</Item>
+          <Item term={JUDGMENT.heldFor}>{formatDuration(verdict.tenureMs)}</Item>
           {verdict.peak > verdict.balance && <Item term={JUDGMENT.peak}>{formatTokens(verdict.peak)}</Item>}
           <Item
             full
             term={JUDGMENT.nextRank}
-            note={step ? `${formatTokens(step.more)} ${JUDGMENT.more}${step.days !== null ? `, ${JUDGMENT.orDays(step.days)}` : ""}` : null}
+            note={
+              step
+                ? `${formatTokens(step.more)} ${JUDGMENT.more}${step.wait !== null ? `, ${JUDGMENT.orHold(formatDuration(step.wait, "up"))}` : ""}`
+                : null
+            }
           >
             {step ? RANK_TITLES[step.rank as Exclude<typeof step.rank, "pet">] : JUDGMENT.topOfOrder}
           </Item>

@@ -53,8 +53,8 @@ export interface Verdict {
   line: string;
   balance: number;
   peak: number;
-  /** Whole days of holding the threshold without selling. */
-  tenureDays: number;
+  /** How long (ms) the wallet has held the threshold without selling. */
+  tenureMs: number;
   lastSellAt: number | null;
   traitorAt: number | null;
   /** Signature of the sale that made this wallet a traitor (shown as proof). */
@@ -63,8 +63,8 @@ export interface Verdict {
   betrayalAmount: number | null;
   /** Forgiven traitors keep a scar forever. */
   scar: boolean;
-  /** Days left until forgiveness, when a traitor is repenting. */
-  redemptionDaysLeft: number | null;
+  /** Time (ms) left until forgiveness, when a traitor is repenting. */
+  redemptionMsLeft: number | null;
   /** When the wallet first reached the threshold (ms), or null if it never did. */
   firstFaithfulAt: number | null;
   /** Place in the Book of the Faithful by the time of entry; filled in by the server. */

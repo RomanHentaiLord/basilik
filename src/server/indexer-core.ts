@@ -2,15 +2,17 @@ import { PublicKey } from "@solana/web3.js";
 import {
   loadEvents,
   readState,
+  saveBurns,
   saveEventRows,
   saveVerdicts,
+  stalestWallets,
   statusesOf,
   writeState,
   type AnyDb,
 } from "@/db/books";
 import { judge } from "@/lib/basilisk/judge";
 import type { Verdict, WalletEvent } from "@/lib/basilisk/types";
-import { parseTransaction, type ParsedTransaction, type TokenBalance } from "@/lib/solana/parse";
+import { parseBurns, parseTransaction, type ParsedTransaction, type TokenBalance } from "@/lib/solana/parse";
 
 /**
  * The sales scanner. It walks the coin's transactions (everything that touches the mint),
@@ -53,6 +55,8 @@ export interface IndexerRun {
   budget?: number;
   /** Wallets kept out of both Books (the creator-fee wallet). */
   exclude?: string[];
+  /** Wallets re-judged per run because time alone changes them (tenure marks, repentance). */
+  refresh?: number;
 }
 
 export interface IndexerResult {
@@ -60,6 +64,10 @@ export interface IndexerResult {
   transactions: number;
   events: number;
   wallets: number;
+  /** Burns of the coin found in this run. */
+  burns: number;
+  /** Wallets re-judged only because time passed. */
+  refreshed: number;
   newTraitors: string[];
   cursor: Cursor;
 }
@@ -163,6 +171,12 @@ export async function runIndexer(run: IndexerRun): Promise<IndexerResult> {
   }
 
   const inserted = rows.length > 0 ? await saveEventRows(run.db, rows) : 0;
+
+  // Burns are counted for everyone, the Altar included: they are offerings, not trades.
+  const burnRows = transactions.flatMap((tx) => (tx ? parseBurns(tx, run.mint) : []));
+  const burned =
+    burnRows.length > 0 ? await saveBurns(run.db, burnRows.map((burn) => ({ ...burn, seal: run.sealsBroken }))) : 0;
+
   const touched = [...new Set(rows.map((row) => row.address))];
   let newTraitors: string[] = [];
 
@@ -180,6 +194,21 @@ export async function runIndexer(run: IndexerRun): Promise<IndexerResult> {
       .map((verdict) => verdict.address);
   }
 
+  // Ranks move with time now (1 hour, 2 hours…), so the oldest verdicts are re-read each run.
+  const refreshLimit = run.refresh ?? 40;
+  const stale = (await stalestWallets(run.db, refreshLimit + touched.length))
+    .filter((address) => !touched.includes(address) && !exclude.has(address))
+    .slice(0, refreshLimit);
+  if (stale.length > 0) {
+    const histories = await loadEvents(run.db, stale);
+    const verdicts = stale.map((address) => {
+      const list = histories.get(address) ?? [];
+      const balance = list.length > 0 ? list[list.length - 1].balanceAfter : 0;
+      return judge({ address, balance, events: list }, { now: run.now, sealsBroken: run.sealsBroken });
+    });
+    await saveVerdicts(run.db, verdicts, "indexer", new Date(run.now));
+  }
+
   await writeState(run.db, CURSOR_KEY, next, new Date(run.now));
 
   return {
@@ -187,6 +216,8 @@ export async function runIndexer(run: IndexerRun): Promise<IndexerResult> {
     transactions: transactions.filter(Boolean).length,
     events: inserted,
     wallets: touched.length,
+    burns: burned,
+    refreshed: stale.length,
     newTraitors,
     cursor: next,
   };
