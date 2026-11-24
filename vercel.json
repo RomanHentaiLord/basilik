@@ -1,4 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "node scripts/migrate.mjs && next build"
+  "buildCommand": "node scripts/migrate.mjs --soft && next build"
 }

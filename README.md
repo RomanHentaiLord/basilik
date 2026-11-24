@@ -53,7 +53,7 @@ npm run dev                  # http://localhost:3000
 | `npm run lint` | ESLint |
 | `npm run build` | продакшен-сборка |
 | `npm run db:check` | проверить подключение к базе и показать таблицы |
-| `npm run db:migrate` | создать таблицы: применить миграции из `drizzle/` |
+| `npm run db:migrate` | создать таблицы: применить миграции из `drizzle/` (Neon или обычный Postgres) |
 | `npm run db:generate` | новая миграция после правки `src/db/schema.ts` |
 | `npm run db:push` | залить схему без миграций (только для экспериментов) |
 | `npm run db:reset-books -- --yes` | очистить книги (кошельки, события, курсор индексатора) после тестов на чужой монете |
@@ -123,6 +123,52 @@ npm run altar:burn
 
 Команда проверит, что файл ключа совпадает с `ALTAR_WALLET`, покажет, сколько у Алтаря монет и SOL, и попросит напечатать `BURN`. Сжигание настоящее (инструкция BurnChecked): supply уменьшается. Через несколько минут индексатор найдёт его, и оно появится на `/burns`, а печать на `/altar` станет «Answered».
 
+## Сервер
+
+Сайт целиком живёт на одном сервере (Ubuntu 24.04): своя база Postgres, сайт, HTTPS (Caddy), таймер индексатора и ночные копии базы. Всё описано в `docker-compose.yml`. Neon и Vercel для этого не нужны. Сайт сам понимает, к какой базе подключён: адрес Neon — через Neon, любой другой — как к обычному Postgres.
+
+**Первый запуск** (команды вводятся на сервере, после `ssh root@IP-сервера`):
+
+```bash
+# 1. Docker и защита: открыты только SSH и сайт
+curl -fsSL https://get.docker.com | sh
+ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw --force enable
+
+# 2. Код
+git clone https://github.com/RomanHentaiLord/basilik.git /opt/basilik
+cd /opt/basilik
+
+# 3. Настройки: заполнить DOMAIN, SITE_URL, POSTGRES_PASSWORD, INDEXER_SECRET и остальное
+cp deploy/server.env.example .env
+openssl rand -hex 24   # пароль базы → POSTGRES_PASSWORD
+openssl rand -hex 32   # секрет индексатора → INDEXER_SECRET
+nano .env              # сохранить: Ctrl+O, Enter; выйти: Ctrl+X
+chmod 600 .env
+
+# 4. Запуск
+docker compose up -d --build
+docker compose logs -f app   # первая сборка — минута-две; выйти из логов: Ctrl+C
+```
+
+Перед шагом 4 у домена в hoster.by должны стоять записи `A` для `@` и `www` на IP сервера: иначе Caddy не получит сертификат HTTPS.
+
+**Обновление** после `git push`: `/opt/basilik/deploy/update.sh` (минуту-две сайт собирается и не отвечает).
+
+**Полезное:**
+
+| Команда | Что делает |
+| --- | --- |
+| `docker compose ps` | что запущено |
+| `docker compose logs -f app` | логи сайта (`caddy`, `indexer`, `backup` — логи остальных) |
+| `docker compose restart app` | перезапустить сайт без пересборки |
+| `docker compose exec app npm run db:check` | проверить базу |
+| `docker compose exec app npm run db:reset-books -- --yes` | очистить книги перед запуском монеты |
+| `nano .env`, потом `docker compose up -d --build` | поменять настройки (`NEXT_PUBLIC_X_URL` и остальное) |
+
+**Копии базы** делаются раз в сутки в `/opt/basilik/backups`, хранятся последние 14. Раз в неделю скачивай их к себе (на своём компьютере): `scp root@IP-сервера:/opt/basilik/backups/*.sql.gz .` Восстановить: `gunzip -c файл.sql.gz | docker compose exec -T db psql -U basilisk basilisk`.
+
+**После переезда на сервер:** в GitHub → Actions → indexer → «Disable workflow» (индексатор теперь крутится на сервере), а проект на Vercel удалить или отключить от репозитория, чтобы он не собирался на каждый пуш.
+
 ## Vercel
 
 - Vercel выкладывает ветку `main`. Пока этап лежит в открытом PR, на основном адресе старая версия; ветки получают свои preview-адреса.
@@ -149,7 +195,9 @@ src/
   db/                     схема Drizzle, клиент Neon, запросы к книгам (books.ts) и к сказанному (voice.ts)
 drizzle/                  SQL-миграции
 assets/fonts/             шрифты для картинки вердикта (.woff, лицензия OFL)
-scripts/                  db-check.mjs, db-reset-books.mjs, migrate.mjs (миграции перед сборкой на Vercel), altar.ts (Алтарь в терминале)
+scripts/                  db.mjs (подключение к базе), db-check, db-reset-books, migrate (миграции), start.sh (запуск в контейнере), altar.ts (Алтарь в терминале)
+deploy/                   Caddyfile, server.env.example (настройки сервера), update.sh
+docker-compose.yml        сервер целиком: база, сайт, HTTPS, индексатор, копии базы
 .github/workflows/        indexer.yml: проход индексатора каждые 10 минут
 ```
 

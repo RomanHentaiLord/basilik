@@ -47,3 +47,6 @@ next-env.d.ts
 altar.json
 *.keypair.json
 .basilisk/
+
+# Server backups
+backups/

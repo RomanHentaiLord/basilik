@@ -1,0 +1,9 @@
+# HTTPS for the domain: Caddy gets and renews the certificate on its own.
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:3000
+}
