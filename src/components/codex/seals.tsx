@@ -55,7 +55,8 @@ export function SealsPage({ overview }: { overview: SealsOverview }) {
       <h2 className="page-title">{CODEX.sealsTitle}</h2>
       <p className="page-text">{BOOK.sealsIntro}</p>
       <SealsGrid seals={views(overview)} fallback={fallbackSeal(overview)} />
-      <div className="mcap">
+      {overview.graduated ? <TrumpetsBox overview={overview} /> : null}
+      <div className="mcap" hidden={overview.graduated}>
         <div className="mcap-row">
           <span>{BOOK.curveNow}</span>
           <strong>
@@ -74,6 +75,33 @@ export function SealsPage({ overview }: { overview: SealsOverview }) {
         )}
       </div>
     </Page>
+  );
+}
+
+/** After the bond: how many trumpets have sounded and how far the next one is. */
+function TrumpetsBox({ overview }: { overview: SealsOverview }) {
+  const { sounded, next } = overview.trumpets;
+  return (
+    <div className="mcap">
+      <div className="mcap-row">
+        <span>{BOOK.trumpetsNow}</span>
+        <strong>
+          {sounded} {BOOK.ofSeven}
+        </strong>
+      </div>
+      {next && (
+        <div className="ink-bar" aria-hidden="true">
+          <span style={{ "--p": percent(next.progress) } as CSSProperties} />
+        </div>
+      )}
+      <div className="mcap-row">
+        <span>{BOOK.mcapNow}</span>
+        <span>{overview.source === "none" ? BOOK.mcapUnknown : formatUsd(overview.mcapUsd)}</span>
+      </div>
+      <p className="mcap-to" style={{ margin: "0.3em 0 0" }}>
+        {next ? BOOK.trumpetNext(next.trumpet.roman, formatUsd(next.trumpet.mcapUsd)) : BOOK.trumpetsDone}
+      </p>
+    </div>
   );
 }
 

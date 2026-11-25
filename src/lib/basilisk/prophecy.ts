@@ -1,7 +1,7 @@
 import { formatTokensShort } from "@/lib/format";
 import { shortAddress } from "@/lib/solana/address";
 import { RANKS, REPENTANCE_SEAL } from "./config";
-import { ORDINALS, SEAL_PROPHECIES, SPECIES_NAMES } from "./copy";
+import { ORDINALS, SEAL_PROPHECIES, SPECIES_NAMES, TRUMPET_PROPHECIES } from "./copy";
 import { fnv1a, type PetSpecies, type Punishment } from "./flavor";
 import type { Verdict } from "./types";
 
@@ -179,6 +179,13 @@ const GRIM_SEAL_CODA = {
 /** The two-part prophecy of a seal: to the Faithful and to the Traitors. */
 export function sealProphecy(seal: number, mood: Mood = "calm"): { faithful: string; traitors: string } {
   const words = SEAL_PROPHECIES[seal] ?? SEAL_PROPHECIES[7];
+  if (mood === "calm") return words;
+  return { faithful: `${words.faithful} ${GRIM_SEAL_CODA.faithful}`, traitors: `${words.traitors} ${GRIM_SEAL_CODA.traitors}` };
+}
+
+/** The two-part prophecy of a trumpet, after the bond. */
+export function trumpetProphecy(trumpet: number, mood: Mood = "calm"): { faithful: string; traitors: string } {
+  const words = TRUMPET_PROPHECIES[trumpet] ?? TRUMPET_PROPHECIES[7];
   if (mood === "calm") return words;
   return { faithful: `${words.faithful} ${GRIM_SEAL_CODA.faithful}`, traitors: `${words.traitors} ${GRIM_SEAL_CODA.traitors}` };
 }

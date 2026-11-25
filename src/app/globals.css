@@ -1682,6 +1682,24 @@ body::before {
     font-style: italic;
     color: var(--ink-muted);
   }
+  /* What a wallet earned for good: trumpets heard, offerings given. */
+  .entry-marks {
+    list-style: none;
+    margin: 0 0 0.7rem;
+    padding: 0;
+    font-size: 1.05rem;
+    font-style: italic;
+    color: #7d5a14;
+  }
+  .entry-marks li::before {
+    content: "";
+    display: inline-block;
+    width: 0.42em;
+    height: 0.42em;
+    margin: 0 0.5em 0.12em 0;
+    background: var(--rubric);
+    transform: rotate(45deg);
+  }
   .entry-place--gilt {
     font-style: normal;
     font-weight: 600;

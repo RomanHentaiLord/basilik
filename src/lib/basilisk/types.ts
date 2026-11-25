@@ -75,6 +75,10 @@ export interface Verdict {
   demo: boolean;
   /** What the Basilisk says to this wallet; filled in by the server. */
   prophecy?: WalletProphecy;
+  /** After the bond: the trumpets this wallet heard in ink; filled in by the server. */
+  trumpetsHeard?: number[];
+  /** Tokens this wallet burned of its own (its offerings); filled in by the server. */
+  offered?: number;
 }
 
 /** The words on a wallet's page, under its verdict. */

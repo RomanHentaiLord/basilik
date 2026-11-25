@@ -1,8 +1,8 @@
-import { and, count, eq, gte } from "drizzle-orm";
+import { and, count, eq, gte, sql } from "drizzle-orm";
 import type { Mood } from "@/lib/basilisk/prophecy";
 import type { Status } from "@/lib/basilisk/types";
 import { readState, writeState, type AnyDb } from "./books";
-import { prophecies, seals, wallets } from "./schema";
+import { burns, prophecies, seals, wallets } from "./schema";
 
 /**
  * What the Basilisk has said, kept in the database: the words of each broken seal,
@@ -112,4 +112,44 @@ export async function saveProphecy(
     .insert(prophecies)
     .values({ address, seal, status, text, createdAt: now })
     .onConflictDoUpdate({ target: [prophecies.address, prophecies.seal], set: { text, status, createdAt: now } });
+}
+
+export interface TrumpetRecord {
+  soundedAt: number;
+  mcapUsd: number;
+  words: SealWords;
+}
+
+const TRUMPETS_KEY = "trumpets";
+
+/** Every trumpet that has sounded, by number. */
+export async function trumpetRecords(db: AnyDb): Promise<Record<number, TrumpetRecord>> {
+  return (await readState<Record<number, TrumpetRecord>>(db, TRUMPETS_KEY)) ?? {};
+}
+
+/** Writes down every sounded trumpet that has no record yet, with its words. Returns their numbers. */
+export async function recordTrumpets(
+  db: AnyDb,
+  { sounded, mcapUsd, now, speak }: { sounded: number; mcapUsd: number; now: number; speak: (n: number) => Promise<SealWords> },
+): Promise<number[]> {
+  if (sounded <= 0) return [];
+  const known = await trumpetRecords(db);
+  const missing = Array.from({ length: sounded }, (_, i) => i + 1).filter((n) => !known[n]);
+  if (missing.length === 0) return [];
+  const words = await Promise.all(missing.map((n) => speak(n)));
+  const next = { ...known };
+  missing.forEach((n, i) => {
+    next[n] = { soundedAt: now, mcapUsd, words: words[i] };
+  });
+  await writeState(db, TRUMPETS_KEY, next);
+  return missing;
+}
+
+/** Tokens a wallet has burned of its own: its offerings. */
+export async function offeredBy(db: AnyDb, address: string): Promise<number> {
+  const [row] = await db
+    .select({ total: sql<number>`coalesce(sum(${burns.amount}), 0)`.mapWith(Number) })
+    .from(burns)
+    .where(eq(burns.burner, address));
+  return row?.total ?? 0;
 }

@@ -1,6 +1,7 @@
 import "server-only";
 import { altarOfferings } from "@/db/books";
 import { db } from "@/db";
+import { SEALS } from "@/lib/basilisk/seals";
 import { tokenAccountsFrom, type TokenAccount } from "@/lib/solana/burn";
 import { rpc } from "@/lib/solana/rpc";
 import { sealsOverview } from "./basilisk";
@@ -32,6 +33,8 @@ export interface AltarSeal {
   brokenAt: number | null;
   /** An offering was burned after it broke. */
   answered: boolean;
+  /** Seals break, trumpets sound. */
+  kind: "seal" | "trumpet";
 }
 
 export interface AltarOverview {
@@ -60,7 +63,14 @@ export async function altarOverview(): Promise<AltarOverview> {
       altar,
       sol: null,
       tokens: null,
-      seals: broken.map((seal) => ({ number: seal.number, roman: seal.roman, label: seal.label, brokenAt: seal.brokenAt, answered: !mint })),
+      seals: broken.map((seal) => ({
+        number: seal.number,
+        roman: seal.roman,
+        label: seal.label,
+        brokenAt: seal.brokenAt,
+        answered: !mint,
+        kind: "seal" as const,
+      })),
       lastOffering: null,
     };
   }
@@ -84,13 +94,27 @@ export async function altarOverview(): Promise<AltarOverview> {
     demo: false,
     altar,
     ...holdings,
-    seals: broken.map((seal) => ({
-      number: seal.number,
-      roman: seal.roman,
-      label: seal.label,
-      brokenAt: seal.brokenAt,
-      answered: (offerings?.answered ?? 0) >= seal.number,
-    })),
+    seals: [
+      ...broken.map((seal) => ({
+        number: seal.number,
+        roman: seal.roman,
+        label: seal.label,
+        brokenAt: seal.brokenAt,
+        answered: (offerings?.answered ?? 0) >= seal.number,
+        kind: "seal" as const,
+      })),
+      // After the bond the Altar answers each trumpet too: stage 8 is the first trumpet.
+      ...overview.trumpets.list
+        .filter((trumpet) => trumpet.sounded)
+        .map((trumpet) => ({
+          number: SEALS.length + trumpet.number,
+          roman: `Trumpet ${trumpet.roman}`,
+          label: trumpet.label,
+          brokenAt: trumpet.soundedAt,
+          answered: (offerings?.answered ?? 0) >= SEALS.length + trumpet.number,
+          kind: "trumpet" as const,
+        })),
+    ],
     lastOffering: offerings?.last ?? null,
   };
 }

@@ -4,6 +4,7 @@ import { motion, useReducedMotion, type TargetAndTransition, type Transition } f
 import { useId, useState } from "react";
 import { FAITHFUL_THRESHOLD, REDEMPTION_MS, REPENTANCE_SEAL } from "@/lib/basilisk/config";
 import { CODEX, JUDGMENT, ORDINALS, RANK_TITLES, SEAL_PROPHECIES, SITE } from "@/lib/basilisk/copy";
+import { marksOf } from "@/lib/basilisk/marks";
 import { nextRankStep, tokensToEnter, untilInk } from "@/lib/basilisk/progress";
 import type { Verdict, WalletProphecy } from "@/lib/basilisk/types";
 import { formatDay, formatDuration, formatTokens, formatTokensShort } from "@/lib/format";
@@ -62,6 +63,7 @@ export function VerdictEntry({ verdict, sealsBroken, isMine, onRemember, onForge
   const pageUrl = `${window.location.origin}/v/${verdict.address}`;
   const shareUrl = `https://x.com/intent/post?text=${encodeURIComponent(shareText(verdict))}&url=${encodeURIComponent(pageUrl)}`;
   const prophecy = verdict.prophecy ?? prophecyFor(verdict, sealsBroken);
+  const marks = marksOf(verdict);
 
   return (
     <motion.article
@@ -113,6 +115,14 @@ export function VerdictEntry({ verdict, sealsBroken, isMine, onRemember, onForge
               ? JUDGMENT.firstWitness(verdict.entryNumber)
               : JUDGMENT.entryNo(verdict.entryNumber)}
         </motion.p>
+      )}
+
+      {marks.length > 0 && (
+        <motion.ul {...ink(0.8)} className="entry-marks">
+          {marks.map((mark) => (
+            <li key={mark}>{mark}</li>
+          ))}
+        </motion.ul>
       )}
 
       <motion.p {...ink(0.9)} className={`m-0 text-[21px] leading-normal ${isPencil ? "text-pencil italic" : ""}`}>

@@ -1,5 +1,5 @@
 import "server-only";
-import { cleanSpeech, parseSealSpeech, PERSONA, personalPrompt, psalmPrompt, sealPrompt } from "@/lib/basilisk/voice";
+import { cleanSpeech, parseSealSpeech, PERSONA, personalPrompt, psalmPrompt, sealPrompt, trumpetPrompt } from "@/lib/basilisk/voice";
 import type { Mood } from "@/lib/basilisk/prophecy";
 import type { Verdict } from "@/lib/basilisk/types";
 
@@ -92,6 +92,14 @@ export async function speakSeal(seal: number, mood: Mood): Promise<{ faithful: s
   const raw = await complete(sealPrompt(seal, mood), { large: seal >= 6, maxTokens: 260 });
   const words = parseSealSpeech(raw);
   if (raw && !words) console.warn(`[oracle] the prophecy of seal ${seal} failed the filter`);
+  return words;
+}
+
+/** The two-part prophecy of a trumpet that has just sounded. */
+export async function speakTrumpet(trumpet: number, mood: Mood): Promise<{ faithful: string; traitors: string } | null> {
+  const raw = await complete(trumpetPrompt(trumpet, mood), { large: true, maxTokens: 260 });
+  const words = parseSealSpeech(raw);
+  if (raw && !words) console.warn(`[oracle] the prophecy of trumpet ${trumpet} failed the filter`);
   return words;
 }
 

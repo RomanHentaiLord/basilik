@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import { RANKS, RANK_FLOORS } from "@/lib/basilisk/config";
 import { LORE, RANK_SHORT, RANK_TITLES } from "@/lib/basilisk/copy";
 import { SEALS } from "@/lib/basilisk/seals";
-import { formatShare, formatTokens } from "@/lib/format";
+import { TRUMPETS } from "@/lib/basilisk/trumpets";
+import { formatShare, formatTokens, formatUsd } from "@/lib/format";
 
 type ChapterKey = keyof typeof LORE.chapters;
 
@@ -52,7 +53,7 @@ function Initial({ letter }: { letter: string }) {
 
 /** The whole story of the coin, written as a manuscript leaf. */
 export function LoreSheet() {
-  const { thought, order, other, seals } = LORE.chapters;
+  const { thought, order, other, seals, trumpets } = LORE.chapters;
   const [first, ...rest] = thought.text;
 
   return (
@@ -126,6 +127,24 @@ export function LoreSheet() {
           ))}
         </ol>
         {paragraphs(seals.text)}
+      </Chapter>
+
+      <Chapter id="trumpets">
+        {paragraphs(trumpets.intro)}
+        <ol className="lore-seals">
+          {TRUMPETS.map((trumpet) => (
+            <li key={trumpet.number}>
+              <span className="lore-seal-mark">
+                {trumpet.roman}
+                <span>
+                  {trumpets.at} {formatUsd(trumpet.mcapUsd)}
+                </span>
+              </span>
+              <span>{trumpet.label}</span>
+            </li>
+          ))}
+        </ol>
+        {paragraphs(trumpets.text)}
       </Chapter>
 
       <Chapter id="altar">{paragraphs(LORE.chapters.altar.text)}</Chapter>

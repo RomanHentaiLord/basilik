@@ -51,6 +51,11 @@ export interface IndexerRun {
   source: ChainSource;
   now: number;
   sealsBroken: number;
+  /**
+   * Written on each burn found in this pass: the seals broken, plus the trumpets sounded after
+   * the bond (8 = the first trumpet). The Altar has answered every stage up to its latest burn.
+   */
+  stage?: number;
   /** Most transactions to read in one run. */
   budget?: number;
   /** Wallets kept out of both Books (the creator-fee wallet). */
@@ -175,7 +180,7 @@ export async function runIndexer(run: IndexerRun): Promise<IndexerResult> {
   // Burns are counted for everyone, the Altar included: they are offerings, not trades.
   const burnRows = transactions.flatMap((tx) => (tx ? parseBurns(tx, run.mint) : []));
   const burned =
-    burnRows.length > 0 ? await saveBurns(run.db, burnRows.map((burn) => ({ ...burn, seal: run.sealsBroken }))) : 0;
+    burnRows.length > 0 ? await saveBurns(run.db, burnRows.map((burn) => ({ ...burn, seal: run.stage ?? run.sealsBroken }))) : 0;
 
   const touched = [...new Set(rows.map((row) => row.address))];
   let newTraitors: string[] = [];

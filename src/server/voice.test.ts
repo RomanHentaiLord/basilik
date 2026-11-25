@@ -1,10 +1,11 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnyDb } from "@/db/books";
 import { testDb } from "@/db/test-db";
-import { bookBalance, cachedProphecy, readPsalm, saveProphecy, sealRecords } from "@/db/voice";
+import { saveBurns } from "@/db/books";
+import { bookBalance, cachedProphecy, offeredBy, readPsalm, saveProphecy, sealRecords, trumpetRecords } from "@/db/voice";
 import { DAY_MS } from "@/lib/basilisk/config";
 import { judge } from "@/lib/basilisk/judge";
-import { personalProphecy, sealProphecy } from "@/lib/basilisk/prophecy";
+import { personalProphecy, sealProphecy, trumpetProphecy } from "@/lib/basilisk/prophecy";
 import type { WalletEvent } from "@/lib/basilisk/types";
 
 // The voice runs on the server; here it gets an in-memory Postgres and a fake model.
@@ -14,6 +15,7 @@ const state = vi.hoisted(() => ({
   awake: false,
   toWallet: vi.fn(),
   seal: vi.fn(),
+  trumpet: vi.fn(),
   psalm: vi.fn(),
 }));
 vi.mock("@/db", () => ({
@@ -25,6 +27,7 @@ vi.mock("./oracle", () => ({
   oracleAwake: () => state.awake,
   speakToWallet: state.toWallet,
   speakSeal: state.seal,
+  speakTrumpet: state.trumpet,
   speakPsalm: state.psalm,
 }));
 
@@ -50,7 +53,8 @@ beforeAll(async () => {
 beforeEach(async () => {
   state.db = db;
   state.awake = false;
-  for (const fn of [state.toWallet, state.seal, state.psalm]) fn.mockReset().mockResolvedValue(null);
+  for (const fn of [state.toWallet, state.seal, state.trumpet, state.psalm]) fn.mockReset().mockResolvedValue(null);
+  await db.execute("delete from burns");
   await db.execute("delete from seals");
   await db.execute("delete from prophecies");
   await db.execute("delete from indexer_state");
@@ -102,6 +106,30 @@ describe("after an indexer pass", () => {
     const pass = await speakAfterPass(db, { now: NOW, broken: 3, mcapUsd: 5_000, curve: 0.3, curveHigh: 0.45 });
     expect(pass.mood).toBe("grim");
     expect((await sealRecords(db))[2].words).toEqual(sealProphecy(3, "grim"));
+  });
+});
+
+describe("after the bond", () => {
+  it("sounds each trumpet once, with its prophecy", async () => {
+    state.trumpet.mockImplementation(async (n: number) => (n === 2 ? { faithful: "Model words.", traitors: "Model red words." } : null));
+    const pass = await speakAfterPass(db, { now: NOW, broken: 7, trumpets: 2, mcapUsd: 2_600_000 });
+    expect(pass.trumpetsSounded).toEqual([1, 2]);
+    const records = await trumpetRecords(db);
+    expect(records[1]).toMatchObject({ soundedAt: NOW, words: trumpetProphecy(1) });
+    expect(records[2].words.faithful).toBe("Model words.");
+
+    const again = await speakAfterPass(db, { now: NOW + 60_000, broken: 7, trumpets: 3, mcapUsd: 5_100_000 });
+    expect(again.trumpetsSounded).toEqual([3]);
+    expect((await trumpetRecords(db))[1].soundedAt).toBe(NOW);
+  });
+
+  it("counts the tokens a wallet burned itself", async () => {
+    await saveBurns(db, [
+      { signature: "o1", burner: ADDRESS, amount: 15_000, at: NOW, seal: 2 },
+      { signature: "o2", burner: ADDRESS, amount: 10_000, at: NOW, seal: 3 },
+      { signature: "o3", burner: "someone-else", amount: 99_000, at: NOW, seal: 3 },
+    ]);
+    expect(await offeredBy(db, ADDRESS)).toBe(25_000);
   });
 });
 

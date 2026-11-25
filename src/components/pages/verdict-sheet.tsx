@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CARD, JUDGMENT, SITE } from "@/lib/basilisk/copy";
+import { marksOf } from "@/lib/basilisk/marks";
 import type { Verdict } from "@/lib/basilisk/types";
 import { shortAddress } from "@/lib/solana/address";
 
@@ -41,6 +42,13 @@ export function VerdictSheet({ address, verdict }: { address: string; verdict: V
       </p>
       <h1 className="sheet-title verdict-title">{verdict.title}</h1>
       <p className="verdict-book">{bookLine(verdict)}</p>
+      {marksOf(verdict).length > 0 && (
+        <ul className="entry-marks">
+          {marksOf(verdict).map((mark) => (
+            <li key={mark}>{mark}</li>
+          ))}
+        </ul>
+      )}
       <p className="verdict-fate">{verdict.fate}</p>
       {prophecy && (
         <div className="prophecy verdict-prophecy">

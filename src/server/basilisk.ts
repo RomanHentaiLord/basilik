@@ -16,9 +16,12 @@ import { FIRST_WITNESS_COUNT } from "@/lib/basilisk/config";
 import { demoHistory } from "@/lib/basilisk/demo";
 import { fnv1a } from "@/lib/basilisk/flavor";
 import { judge } from "@/lib/basilisk/judge";
+import { trumpetProphecy } from "@/lib/basilisk/prophecy";
 import { countBrokenSeals, nextSeal, SEALS, type MarketState } from "@/lib/basilisk/seals";
+import { countTrumpets, nextTrumpet, TRUMPETS, trumpetsHeard } from "@/lib/basilisk/trumpets";
 import type { Verdict, WalletEvent } from "@/lib/basilisk/types";
 import { getWalletHistory } from "@/lib/solana/history";
+import { offeredBy } from "@/db/voice";
 import { DEMO_MARKET, getMarketState, type MarketSource } from "@/lib/solana/market";
 import { tokenMint } from "./env";
 import { readVoice, walletProphecy } from "./voice";
@@ -90,6 +93,7 @@ export async function sealsOverview() {
   const market = await marketState();
   const broken = countBrokenSeals(market);
   const voice = await readVoice(broken, market);
+  const sounded = countTrumpets({ graduated: market.graduated, athMcapUsd: market.athMcapUsd });
   return {
     demo: market.demo,
     mcapUsd: market.mcapUsd,
@@ -107,6 +111,17 @@ export async function sealsOverview() {
       words: voice.words[seal.number] ?? null,
       brokenAt: voice.brokenAt[seal.number] ?? null,
     })),
+    /** After the bond, the second chapter: seven trumpets on the market cap. */
+    trumpets: {
+      sounded,
+      next: market.graduated ? nextTrumpet(market.mcapUsd, sounded) : null,
+      list: TRUMPETS.map((trumpet) => ({
+        ...trumpet,
+        sounded: trumpet.number <= sounded,
+        soundedAt: voice.trumpets[trumpet.number]?.soundedAt ?? null,
+        words: trumpet.number <= sounded ? (voice.trumpets[trumpet.number]?.words ?? trumpetProphecy(trumpet.number)) : null,
+      })),
+    },
     /** Grim when the curve fell back or more wallets went red than into ink. */
     mood: voice.mood,
     /** Today's psalm, from the first seal. */
@@ -132,13 +147,31 @@ export async function judgeWallet(address: string): Promise<Verdict> {
   if (!mint) {
     const seals = await sealsOverview();
     const verdict = withDemoEntry(judge(demoHistory(address, now), { now, sealsBroken: seals.broken, demo: true }));
-    return { ...verdict, prophecy: await walletProphecy(verdict, wordsOf(seals)) };
+    return { ...verdict, prophecy: await walletProphecy(verdict, wordsOf(seals)), ...(await marksOf(verdict, seals, now)) };
   }
 
   const [history, seals] = await Promise.all([getWalletHistory(address, mint), sealsOverview()]);
   const judged = judge(history, { now, sealsBroken: seals.broken });
   const verdict = db ? await writeIntoBooks(db, judged, history.events) : judged;
-  return { ...verdict, prophecy: await walletProphecy(verdict, wordsOf(seals)) };
+  return { ...verdict, prophecy: await walletProphecy(verdict, wordsOf(seals)), ...(await marksOf(verdict, seals, now)) };
+}
+
+/** The marks on a wallet's page: the trumpets it heard in ink, and the tokens it burned itself. */
+async function marksOf(
+  verdict: Verdict,
+  seals: Awaited<ReturnType<typeof sealsOverview>>,
+  now: number,
+): Promise<Pick<Verdict, "trumpetsHeard" | "offered">> {
+  const soundedAt: Record<number, number> = {};
+  for (const trumpet of seals.trumpets.list) if (trumpet.soundedAt !== null) soundedAt[trumpet.number] = trumpet.soundedAt;
+  const heard = trumpetsHeard(verdict, soundedAt, now);
+  if (verdict.demo || !db) return { trumpetsHeard: heard, offered: 0 };
+  try {
+    return { trumpetsHeard: heard, offered: await offeredBy(db, verdict.address) };
+  } catch (error) {
+    console.error("[judge] could not read the wallet's offerings", error);
+    return { trumpetsHeard: heard, offered: 0 };
+  }
 }
 
 /** A stored judgment this fresh is shown on the verdict's page without asking the chain. */
@@ -159,7 +192,7 @@ export async function rememberedVerdict(address: string): Promise<Verdict | null
   const verdict = judge({ address, balance: stored.balance, events: stored.events }, { now, sealsBroken: seals.broken });
   const entry = verdict.firstFaithfulAt === null ? null : await entryOf(db, address);
   const placed = { ...verdict, entryNumber: entry?.number ?? null, firstWitness: entry?.firstWitness ?? false };
-  return { ...placed, prophecy: await walletProphecy(placed, wordsOf(seals)) };
+  return { ...placed, prophecy: await walletProphecy(placed, wordsOf(seals)), ...(await marksOf(placed, seals, now)) };
 }
 
 /** The seal words in the shape walletProphecy() reads. */

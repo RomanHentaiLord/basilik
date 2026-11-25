@@ -69,7 +69,11 @@ export function AltarSheet({ overview }: { overview: AltarOverview }) {
                 </span>
                 <span className="altar-seal-state">
                   {seal.answered ? ALTAR_PAGE.answered : ALTAR_PAGE.owed}
-                  {seal.brokenAt !== null && <small>, broken {formatMoment(seal.brokenAt)}</small>}
+                  {seal.brokenAt !== null && (
+                    <small>
+                      , {seal.kind === "trumpet" ? "sounded" : "broken"} {formatMoment(seal.brokenAt)}
+                    </small>
+                  )}
                 </span>
               </li>
             ))}

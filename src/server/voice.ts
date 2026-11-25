@@ -6,18 +6,30 @@ import {
   cachedProphecy,
   readPsalm,
   recordBrokenSeals,
+  recordTrumpets,
   saveProphecy,
   sealRecords,
+  trumpetRecords,
   writePsalm,
   type Psalm,
   type SealWords,
+  type TrumpetRecord,
 } from "@/db/voice";
 import { DAY_MS, PERSONAL_SEAL, PUNISHMENT_SEAL } from "@/lib/basilisk/config";
 import { JUDGMENT, ORDINALS } from "@/lib/basilisk/copy";
-import { dayKey, moodOf, namedPunishment, personalProphecy, psalmFor, sealProphecy, type Mood } from "@/lib/basilisk/prophecy";
+import {
+  dayKey,
+  moodOf,
+  namedPunishment,
+  personalProphecy,
+  psalmFor,
+  sealProphecy,
+  trumpetProphecy,
+  type Mood,
+} from "@/lib/basilisk/prophecy";
 import type { Verdict, WalletProphecy } from "@/lib/basilisk/types";
 import { shortAddress } from "@/lib/solana/address";
-import { oracleAwake, speakPsalm, speakSeal, speakToWallet } from "./oracle";
+import { oracleAwake, speakPsalm, speakSeal, speakToWallet, speakTrumpet } from "./oracle";
 
 /** What the Basilisk has said so far, as the pages read it. */
 export interface Voice {
@@ -30,6 +42,8 @@ export interface Voice {
   words: Record<number, SealWords>;
   /** When each seal broke (ms), when the indexer saw it. */
   brokenAt: Record<number, number>;
+  /** After the bond: the trumpets that have sounded, by number. */
+  trumpets: Record<number, TrumpetRecord>;
 }
 
 /** The voice from the written words alone: demo mode, no database, or a database that failed. */
@@ -38,7 +52,7 @@ function writtenVoice(broken: number, mood: Mood, now: number): Voice {
   for (let seal = 1; seal <= broken; seal++) words[seal] = sealProphecy(seal);
   const day = dayKey(now);
   const psalm = broken >= 1 ? { day, text: psalmFor(day, mood), mood, source: "template" as const } : null;
-  return { broken, mood, psalm, words, brokenAt: {} };
+  return { broken, mood, psalm, words, brokenAt: {}, trumpets: {} };
 }
 
 /** Reads the seals' words and today's psalm. Never asks the model: only the indexer does. */
@@ -50,14 +64,14 @@ export async function readVoice(
   const marketMood = moodOf({ curve: market.curve, curveHigh: market.curveHigh });
   if (market.demo || !db) return writtenVoice(broken, marketMood, now);
   try {
-    const [records, today] = await Promise.all([sealRecords(db), readPsalm(db, dayKey(now))]);
+    const [records, today, trumpets] = await Promise.all([sealRecords(db), readPsalm(db, dayKey(now)), trumpetRecords(db)]);
     const written = writtenVoice(broken, today?.mood ?? marketMood, now);
     for (const record of records) {
       if (record.number > broken) continue;
       if (record.words) written.words[record.number] = record.words;
       written.brokenAt[record.number] = record.brokenAt;
     }
-    return { ...written, psalm: broken >= 1 ? (today ?? written.psalm) : null };
+    return { ...written, psalm: broken >= 1 ? (today ?? written.psalm) : null, trumpets };
   } catch (error) {
     console.error("[voice] could not read what the Basilisk said", error);
     return writtenVoice(broken, marketMood, now);
@@ -69,6 +83,11 @@ export async function sealWords(seal: number, mood: Mood): Promise<SealWords> {
   return (await speakSeal(seal, mood)) ?? sealProphecy(seal, mood);
 }
 
+/** A trumpet's words: the model's, or the written ones. */
+export async function trumpetWords(trumpet: number, mood: Mood): Promise<SealWords> {
+  return (await speakTrumpet(trumpet, mood)) ?? trumpetProphecy(trumpet, mood);
+}
+
 /**
  * After each indexer pass: write down newly broken seals with their prophecies, and today's
  * psalm once the first seal is broken. The model, when there is one, is only ever called here
@@ -76,18 +95,32 @@ export async function sealWords(seal: number, mood: Mood): Promise<SealWords> {
  */
 export async function speakAfterPass(
   database: AnyDb,
-  { now, broken, mcapUsd, curve, curveHigh }: { now: number; broken: number; mcapUsd: number; curve?: number; curveHigh?: number },
-): Promise<{ mood: Mood; sealsSpoken: number[]; psalm: "kept" | "written" | "none" }> {
+  {
+    now,
+    broken,
+    trumpets = 0,
+    mcapUsd,
+    curve,
+    curveHigh,
+  }: { now: number; broken: number; trumpets?: number; mcapUsd: number; curve?: number; curveHigh?: number },
+): Promise<{ mood: Mood; sealsSpoken: number[]; trumpetsSounded: number[]; psalm: "kept" | "written" | "none" }> {
   const balance = await bookBalance(database, now - DAY_MS);
   const mood = moodOf({ curve, curveHigh, ...balance });
   const sealsSpoken = await recordBrokenSeals(database, { broken, mcapUsd, now, speak: (seal) => sealWords(seal, mood) });
+  const trumpetsSounded = await recordTrumpets(database, {
+    sounded: trumpets,
+    mcapUsd,
+    now,
+    speak: (n) => trumpetWords(n, mood),
+  });
 
-  if (broken < 1) return { mood, sealsSpoken, psalm: "none" };
+  const done = { mood, sealsSpoken, trumpetsSounded };
+  if (broken < 1) return { ...done, psalm: "none" };
   const day = dayKey(now);
-  if (await readPsalm(database, day)) return { mood, sealsSpoken, psalm: "kept" };
+  if (await readPsalm(database, day)) return { ...done, psalm: "kept" };
   const spoken = await speakPsalm(day, broken, mood);
   await writePsalm(database, { day, text: spoken ?? psalmFor(day, mood), mood, source: spoken ? "model" : "template" });
-  return { mood, sealsSpoken, psalm: "written" };
+  return { ...done, psalm: "written" };
 }
 
 /** The model's words for a wallet, cached per seal and status; the written ones otherwise. */

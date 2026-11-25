@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import { MARKET_ATH_KEY, mergeMarketMemory, readState, tryLock, unlock, writeState, type MarketMemory } from "@/db/books";
 import { db } from "@/db";
 import { countBrokenSeals } from "@/lib/basilisk/seals";
+import { countTrumpets } from "@/lib/basilisk/trumpets";
 import type { ParsedTransaction } from "@/lib/solana/parse";
 import { getMarketState, PROVIDERS } from "@/lib/solana/market";
 import { getTransactions, rpc } from "@/lib/solana/rpc";
@@ -46,6 +47,9 @@ export type IndexerOutcome =
       mood: "calm" | "grim" | null;
       /** Seals that broke and spoke during this pass. */
       sealsSpoken: number[];
+      /** Trumpets sounded so far (after the bond), and those that sounded during this pass. */
+      trumpets: number;
+      trumpetsSounded: number[];
       /** Today's psalm: written in this pass, kept from an earlier one, or none before the first seal. */
       psalm: "kept" | "written" | "none";
     } & IndexerResult)
@@ -91,8 +95,20 @@ export async function runIndexerOnce({ force = false }: { force?: boolean } = {}
       curveHigh: memory.curveHigh,
     });
 
+    // After the bond, the trumpets: heights of the confirmed market cap.
+    const trumpets = countTrumpets({ graduated: memory.graduated, athMcapUsd: memory.usd });
+
     const exclude = [process.env.ALTAR_WALLET?.trim()].filter((address): address is string => Boolean(address));
-    const result = await runIndexer({ db, mint, source: rpcSource(mint), now, sealsBroken, budget: BUDGET, exclude });
+    const result = await runIndexer({
+      db,
+      mint,
+      source: rpcSource(mint),
+      now,
+      sealsBroken,
+      stage: sealsBroken + trumpets,
+      budget: BUDGET,
+      exclude,
+    });
     await writeState(db, "last-run", { at: now, scanned: result.scanned, events: result.events });
 
     // A seal that has just broken speaks once, and the psalm is written once a day.
@@ -101,11 +117,13 @@ export async function runIndexerOnce({ force = false }: { force?: boolean } = {}
       voice = await speakAfterPass(db, {
         now,
         broken: sealsBroken,
+        trumpets,
         mcapUsd: market.mcapUsd,
         curve: market.curve ?? memory.lastCurve,
         curveHigh: memory.curveHigh,
       });
       if (voice.sealsSpoken.length > 0) console.log(`[indexer] seals spoke: ${voice.sealsSpoken.join(", ")}`);
+      if (voice.trumpetsSounded.length > 0) console.log(`[indexer] trumpets sounded: ${voice.trumpetsSounded.join(", ")}`);
     } catch (error) {
       console.error("[indexer] the Basilisk could not speak", error);
     }
@@ -126,6 +144,8 @@ export async function runIndexerOnce({ force = false }: { force?: boolean } = {}
       sealsBroken,
       mood: voice?.mood ?? null,
       sealsSpoken: voice?.sealsSpoken ?? [],
+      trumpets,
+      trumpetsSounded: voice?.trumpetsSounded ?? [],
       psalm: voice?.psalm ?? "none",
       ...result,
     };

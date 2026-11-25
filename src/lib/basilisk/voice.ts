@@ -3,6 +3,7 @@ import { shortAddress } from "@/lib/solana/address";
 import { ORDINALS } from "./copy";
 import type { Mood } from "./prophecy";
 import { SEALS } from "./seals";
+import { TRUMPETS } from "./trumpets";
 import type { Verdict } from "./types";
 
 /**
@@ -88,6 +89,19 @@ export function sealPrompt(seal: number, mood: Mood): string {
   const which = SEALS[seal - 1];
   return [
     `The ${ORDINALS[seal]} of your seven seals has just been broken: ${which?.label ?? "the Bond"}.`,
+    moodLine(mood),
+    "Write its prophecy in two parts: one to the Faithful, one to the Traitors. Two or three sentences each, under 240 characters each.",
+    "Answer in exactly two lines:",
+    "FAITHFUL: <words to the Faithful>",
+    "TRAITORS: <words to the Traitors>",
+  ].join("\n");
+}
+
+/** The prompt for a trumpet's two-part prophecy, after the bond. */
+export function trumpetPrompt(trumpet: number, mood: Mood): string {
+  const which = TRUMPETS[trumpet - 1];
+  return [
+    `All seven of your seals are broken and the coin has left the curve. Now the ${ORDINALS[trumpet]} of seven trumpets has sounded: ${which?.label ?? "the last trumpet"}.`,
     moodLine(mood),
     "Write its prophecy in two parts: one to the Faithful, one to the Traitors. Two or three sentences each, under 240 characters each.",
     "Answer in exactly two lines:",
